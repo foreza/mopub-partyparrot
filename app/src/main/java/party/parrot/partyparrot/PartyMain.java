@@ -30,31 +30,81 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         setContentView(R.layout.activity_party_main);
 
        //  A list of rewarded video adapters to initialize
-        List<String> networksToInit = new ArrayList<String>();
+        List<String> networksToInit = new ArrayList();
+        // networksToInit.add("com.mopub.mobileads.AerServCustomEventBanner");
 
-//        networksToInit.add("com.mopub.mobileads.VungleRewardedVideo");
 
-        SdkConfiguration sdkConfiguration = new SdkConfiguration.Builder("9cd3dce5635c45868a2e451c484dab0b")
+        /*
+        - MoPub Plugin Android: 81aaafbeefd74cd787ca26041c6c8833 (has no impressions, not sure if works)
+        - MoPub Android Test Placement: 73bd31810f624db398332fa95e2d058d (serves a raw creative that we uploaded, works for sure)
+         */
+
+        SdkConfiguration sdkConfiguration = new SdkConfiguration.Builder("81aaafbeefd74cd787ca26041c6c8833")
                 .withNetworksToInit(networksToInit)
                 .build();
 
-         // MoPub.initializeSdk(this, sdkConfiguration, initSdkListener());
-        // ^ This currently causes issues. Not able to use this.
+        MoPub.initializeSdk(this, sdkConfiguration, initSdkListener());
 
-          AerServSdk.init(this, "380000");
+
+        /*
+        - MocoSpace APP ID: 103156
+        -
+
+         */
+        AerServSdk.init(this, "103156"); // ibugs, should hopefully init. if not, use
+
+
+        /*
+        Placements to try..
+        1029840 - Publisher name: aerserv, Application name: My_Test_App, Placement name: iOSMopubPluginTest
+         */
+
+
+        /*
+        AerServ Plugin Interstitial (replacement) : (https://app.mopub.com/advertise/line_items/ee62d34418eb4863bd663c59c3ba4a14/edit/)
+        data optional: {"placement": "1029840", "appId": "1005911"}
+
+        will try changing it to something i can actually control / redirect to a customer so i can test
+
+                data optional: {"placement": "1007766", "appId": "103156"}
+
+
+
+         */
 
 
         moPubView = (MoPubView) findViewById(R.id.adview);
         moPubView.setBannerAdListener(this);
-        moPubView.setAdUnitId("9cd3dce5635c45868a2e451c484dab0b"); // Enter your Ad Unit ID from www.mopub.com
-        moPubView.loadAd();
 
+        // This sample ad unit is from the MoPubSample aerserv application for an android banner: d73714cdd28d43bbbada62c6aaedfcc7
+        // Android AerServ Mediated Banner
+
+        /*
+
+        MoPub Plugin Android - Banner Ad: 9fe062ebcd89471cb09caa57c4add202
+
+         */
+
+        moPubView.setAdUnitId("9fe062ebcd89471cb09caa57c4add202"); // Enter your Ad Unit ID from www.mopub.com
+//        moPubView.loadAd();
+
+
+         // 6482ffa195a54c369e7bea3288919f4b - MoPubSample sample interstitial // Android AerServ Mediated Interstitial
         // Loads an interstitial
-        mInterstitial = new MoPubInterstitial(this, "b319d8ba93214763b61814284748800c");
+
+
+        /*
+        - MoPub Plugin Android, AerServ Fullscreen - a3fa142159ec45338c586765ec44c0f0
+        - MoPub Android Test Placement, AerServ Interstitial_2 - 5786ec14412744a4b0f9a706bbc0cd8d
+
+         */
+        mInterstitial = new MoPubInterstitial(this, "a3fa142159ec45338c586765ec44c0f0");
         // Remember that "this" refers to your current activity.
         mInterstitial.setInterstitialAdListener(this);
-        mInterstitial.load();
+        // mInterstitial.load();
 }
+
+
 
     // Sent when the banner has successfully retrieved an ad.
     public void onBannerLoaded(MoPubView banner){
@@ -111,7 +161,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     public void onInterstitialFailed(MoPubInterstitial interstitial, MoPubErrorCode errorCode) {
         // The interstitial has failed to load. Inspect errorCode for additional information.
         // This is an excellent place to load more ads.
-        Log.d(log, "Interstitial load failed");
+        Log.d(log, "Interstitial load failed: " + errorCode);
 
     }
 
@@ -154,10 +204,14 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
            /* MoPub SDK initialized.
            Check if you should show the consent dialog here, and make your ad requests. */
 
+                Log.d(log, "MoPub SDK init");
+
+                // mInterstitial.load();
+                moPubView.loadAd();
+
             }
         };
     }
-
 
 
 }
