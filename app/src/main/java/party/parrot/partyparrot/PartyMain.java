@@ -19,6 +19,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
     private MoPubView moPubView;
     private MoPubInterstitial mInterstitial;
+
     static String log = "PARROT";
 
 
@@ -27,7 +28,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_party_main);
 
-       //  A list of rewarded video adapters to initialize
+        //  A list of rewarded video adapters to initialize
         List<String> networksToInit = new ArrayList();
         networksToInit.add("com.mopub.mobileads.AerServCustomEventBanner");
         networksToInit.add("com.mopub.mobileads.AerServCustomEventInterstitial");
@@ -45,14 +46,18 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         moPubView = (MoPubView) findViewById(R.id.adview);
         moPubView.setBannerAdListener(this);
 
-        // Party Banner: 549952a8447d4911b8d690c21b66abac
+         // Party Banner: 549952a8447d4911b8d690c21b66abac
          moPubView.setAdUnitId("549952a8447d4911b8d690c21b66abac");
 
 
         // Party Interstitial: 2beb37597378451f85ef0bfba0cd7908\
-         mInterstitial = new MoPubInterstitial(this, "2beb37597378451f85ef0bfba0cd7908");
-         mInterstitial.setInterstitialAdListener(this);
-}
+        mInterstitial = new MoPubInterstitial(this, "2beb37597378451f85ef0bfba0cd7908");
+        mInterstitial.setInterstitialAdListener(this);
+        mInterstitial.setKeywords("Party");
+    }
+
+
+
 
     private SdkInitializationListener initSdkListener() {
         return new SdkInitializationListener() {
@@ -63,9 +68,9 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
                 Log.d(log, "MoPub SDK initialized");
 
                 // Begin loading the interstitial, and load+show the banner
+                 // moPubView.loadAd();
+                //
                 mInterstitial.load();
-                moPubView.loadAd();
-
             }
         };
     }
@@ -107,8 +112,14 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     @Override
     public void onInterstitialLoaded(MoPubInterstitial interstitial) {
         // The interstitial has been cached and is ready to be shown.
-        Log.d(log, "Interstitial loaded");
-        mInterstitial.show();
+
+        Log.d(log, "An Interstitial was loaded with kw: " + interstitial.getKeywords());
+
+        if (interstitial.getKeywords() == "Party"){
+            Log.d(log, "MAIN Interstitial loaded, showing now");
+            mInterstitial.show();
+        }
+
     }
 
     @Override

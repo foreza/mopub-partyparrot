@@ -6,7 +6,6 @@ import java.util.List;
 import java.util.Map;
 
 import com.mopub.common.util.Json;
-import com.aerserv.sdk.AerServConfig;
 
 import android.text.TextUtils;
 import android.util.Log;
@@ -14,7 +13,7 @@ import android.util.Log;
 
 public class AerServPluginUtil {
 	public static final String LOG_TAG = AerServPluginUtil.class.getSimpleName();
-
+	
 	public static String getString(String key,
 			Map<String, Object> localExtras, Map<String, String> serverExtras) {
 		if (serverExtras != null
