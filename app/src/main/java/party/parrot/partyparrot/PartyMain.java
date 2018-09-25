@@ -3,6 +3,7 @@ package party.parrot.partyparrot;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 
 import com.aerserv.sdk.AerServSdk;
 import com.mopub.common.MoPub;
@@ -67,15 +68,27 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
                 //  MoPub SDK initialized.
                 Log.d(log, "MoPub SDK initialized");
 
-                // Begin loading the interstitial, and load+show the banner
-                moPubView.loadAd();
-                //
-                mInterstitial.load();
             }
         };
     }
 
 
+    public void loadBanner(View view){
+        if (moPubView != null) {
+            moPubView.loadAd();
+            Log.d(log, "loadBanner -> Banner Loading");
+
+        }
+    }
+
+
+    public void loadInterstitial(View view) {
+        if (mInterstitial != null){
+            mInterstitial.load();
+            Log.d(log, "loadInterstitial -> Interstitial Loading");
+
+        }
+    }
 
 
 
