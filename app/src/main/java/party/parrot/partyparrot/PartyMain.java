@@ -68,12 +68,15 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
                 Log.d(log, "MoPub SDK initialized");
 
                 // Begin loading the interstitial, and load+show the banner
-                 // moPubView.loadAd();
+                moPubView.loadAd();
                 //
                 mInterstitial.load();
             }
         };
     }
+
+
+
 
 
 
