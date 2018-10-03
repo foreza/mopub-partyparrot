@@ -36,7 +36,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
 
         // Party App ID: 6208244713bc4437a767f6aa8215bc29
-        SdkConfiguration sdkConfiguration = new SdkConfiguration.Builder("6208244713bc4437a767f6aa8215bc29")
+        SdkConfiguration sdkConfiguration = new SdkConfiguration.Builder("4c81921d3e124a77a22abd270e92bc30")
                 .withNetworksToInit(networksToInit)
                 .build();
 
@@ -48,7 +48,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         moPubView.setBannerAdListener(this);
 
          // Party Banner: 549952a8447d4911b8d690c21b66abac
-         moPubView.setAdUnitId("549952a8447d4911b8d690c21b66abac");
+         moPubView.setAdUnitId("4c81921d3e124a77a22abd270e92bc30"); // zynga ban: 4c81921d3e124a77a22abd270e92bc30
 
 
         // Party Interstitial: 2beb37597378451f85ef0bfba0cd7908\
