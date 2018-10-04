@@ -30,31 +30,31 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         setContentView(R.layout.activity_party_main);
 
         //  A list of rewarded video adapters to initialize
-        List<String> networksToInit = new ArrayList();
-        networksToInit.add("com.mopub.mobileads.AerServCustomEventBanner");
-        networksToInit.add("com.mopub.mobileads.AerServCustomEventInterstitial");
+//        List<String> networksToInit = new ArrayList();
+//        networksToInit.add("com.mopub.mobileads.AerServCustomEventBanner");
+//        networksToInit.add("com.mopub.mobileads.AerServCustomEventInterstitial");
 
 
         // Party App ID: 6208244713bc4437a767f6aa8215bc29
         SdkConfiguration sdkConfiguration = new SdkConfiguration.Builder("4c81921d3e124a77a22abd270e92bc30")
-                .withNetworksToInit(networksToInit)
+//                .withNetworksToInit(networksToInit)
                 .build();
 
         MoPub.initializeSdk(this, sdkConfiguration, initSdkListener());
-        AerServSdk.init(this, "380000");
+//        AerServSdk.init(this, "380000");
 
 
         moPubView = (MoPubView) findViewById(R.id.adview);
         moPubView.setBannerAdListener(this);
 
-         // Party Banner: 549952a8447d4911b8d690c21b66abac
+//          Party Banner: 549952a8447d4911b8d690c21b66abac
          moPubView.setAdUnitId("4c81921d3e124a77a22abd270e92bc30"); // zynga ban: 4c81921d3e124a77a22abd270e92bc30
 
 
         // Party Interstitial: 2beb37597378451f85ef0bfba0cd7908\
         mInterstitial = new MoPubInterstitial(this, "2beb37597378451f85ef0bfba0cd7908");
         mInterstitial.setInterstitialAdListener(this);
-        mInterstitial.setKeywords("Party");
+//        mInterstitial.setKeywords("Party");
     }
 
 
