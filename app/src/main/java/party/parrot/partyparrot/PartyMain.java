@@ -41,7 +41,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
                 .build();
 
         MoPub.initializeSdk(this, sdkConfiguration, initSdkListener());
-//        AerServSdk.init(this, "380000");
+        AerServSdk.init(this, "380000");
 
 
         moPubView = (MoPubView) findViewById(R.id.adview);
