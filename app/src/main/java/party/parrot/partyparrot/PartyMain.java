@@ -4,11 +4,14 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.widget.TextView;
 
 import com.aerserv.sdk.AerServSdk;
+import com.aerserv.sdk.utils.UrlBuilder;
 import com.mopub.common.MoPub;
 import com.mopub.common.SdkConfiguration;
 import com.mopub.common.SdkInitializationListener;
+import com.mopub.common.logging.MoPubLog;
 import com.mopub.mobileads.MoPubErrorCode;
 import com.mopub.mobileads.MoPubInterstitial;
 import com.mopub.mobileads.MoPubView;
@@ -20,7 +23,6 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
     private MoPubView moPubView;
     private MoPubInterstitial mInterstitial;
-
     static String log = "PARROT";
 
 
@@ -30,17 +32,17 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         setContentView(R.layout.activity_party_main);
 
         // Party App ID: 6208244713bc4437a767f6aa8215bc29
-        SdkConfiguration sdkConfiguration = new SdkConfiguration.Builder("6208244713bc4437a767f6aa8215bc29")
+        SdkConfiguration sdkConfiguration = new SdkConfiguration.Builder("549952a8447d4911b8d690c21b66abac")
                 .build();
 
         MoPub.initializeSdk(this, sdkConfiguration, initSdkListener());
         AerServSdk.init(this, "380000");
-
+        getDisplaySDKVersions();
 
         moPubView = (MoPubView) findViewById(R.id.adview);
         moPubView.setBannerAdListener(this);
 
-//          Party Banner: 549952a8447d4911b8d690c21b66abac
+        // Party Banner: 549952a8447d4911b8d690c21b66abac
          moPubView.setAdUnitId("549952a8447d4911b8d690c21b66abac");
 
 
@@ -49,14 +51,21 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         mInterstitial.setInterstitialAdListener(this);
     }
 
+    public void getDisplaySDKVersions(){
 
+        TextView mpv = findViewById(R.id.MPSdkVersion);
+        mpv.setText("MoPub SDK Version:" + MoPub.SDK_VERSION);
+
+        TextView imv = findViewById(R.id.IMSdkVersion);
+        imv.setText("IM SDK Version:" + UrlBuilder.VERSION);
+
+    }
 
 
     private SdkInitializationListener initSdkListener() {
         return new SdkInitializationListener() {
             @Override
             public void onInitializationFinished() {
-
                 //  MoPub SDK initialized.
                 Log.d(log, "MoPub SDK initialized");
 
