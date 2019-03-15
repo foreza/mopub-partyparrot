@@ -23,7 +23,9 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
     private MoPubView moPubView;
     private MoPubInterstitial mInterstitial;
-    static String log = "PARROT";
+    public static String log = "PARROT";
+    public String bannerAdUnitID =  "549952a8447d4911b8d690c21b66abac";
+    public String interstitialAdUnitId = "2beb37597378451f85ef0bfba0cd7908";
 
 
     @Override
@@ -31,23 +33,18 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_party_main);
 
-        // Party App ID: 6208244713bc4437a767f6aa8215bc29
-        SdkConfiguration sdkConfiguration = new SdkConfiguration.Builder("549952a8447d4911b8d690c21b66abac")
+        SdkConfiguration sdkConfiguration = new SdkConfiguration.Builder(bannerAdUnitID)
                 .build();
 
         MoPub.initializeSdk(this, sdkConfiguration, initSdkListener());
-        AerServSdk.init(this, "380000");
+        AerServSdk.init(this, "1017084");
         getDisplaySDKVersions();
 
         moPubView = (MoPubView) findViewById(R.id.adview);
         moPubView.setBannerAdListener(this);
+        moPubView.setAdUnitId(bannerAdUnitID);
 
-        // Party Banner: 549952a8447d4911b8d690c21b66abac
-         moPubView.setAdUnitId("549952a8447d4911b8d690c21b66abac");
-
-
-        // Party Interstitial: 2beb37597378451f85ef0bfba0cd7908\
-        mInterstitial = new MoPubInterstitial(this, "2beb37597378451f85ef0bfba0cd7908");
+        mInterstitial = new MoPubInterstitial(this, interstitialAdUnitId);
         mInterstitial.setInterstitialAdListener(this);
     }
 
