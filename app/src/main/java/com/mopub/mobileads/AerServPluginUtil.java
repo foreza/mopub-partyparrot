@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.mopub.common.util.Json;
+import com.aerserv.sdk.AerServConfig;
 
 import android.text.TextUtils;
 import android.util.Log;
@@ -13,7 +14,7 @@ import android.util.Log;
 
 public class AerServPluginUtil {
 	public static final String LOG_TAG = AerServPluginUtil.class.getSimpleName();
-	
+
 	public static String getString(String key,
 			Map<String, Object> localExtras, Map<String, String> serverExtras) {
 		if (serverExtras != null
@@ -30,25 +31,6 @@ public class AerServPluginUtil {
 		return null;
 	}
 
-	public static Integer getInteger(String key,
-			Map<String, Object> localExtras, Map<String, String> serverExtras) {
-		if (serverExtras != null
-				&& serverExtras.get(key) != null) {
-			try {
-				return Integer.parseInt(serverExtras.get(key));
-			} catch (NumberFormatException e) {
-				Log.d(LOG_TAG, "Cannot parse '" + serverExtras.get(key) + "'"
-						+ " in serverExtras to Integer.  Trying from localExtras instead.");
-			}
-		}
-		if (localExtras != null
-				&& localExtras.get(key) != null
-				&& localExtras.get(key) instanceof Integer) {
-			return (Integer) localExtras.get(key);
-		}
-		return null;
-	}
-	
 	public static List<String> getStringList(String key,
 			Map<String, Object> localExtras, Map<String, String> serverExtras) {
 		if (serverExtras != null

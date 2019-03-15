@@ -7,7 +7,6 @@ import android.view.View;
 import android.widget.TextView;
 
 import com.aerserv.sdk.AerServSdk;
-import com.aerserv.sdk.utils.UrlBuilder;
 import com.mopub.common.MoPub;
 import com.mopub.common.SdkConfiguration;
 import com.mopub.common.SdkInitializationListener;
@@ -57,7 +56,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         mpv.setText("MoPub SDK Version:" + MoPub.SDK_VERSION);
 
         TextView imv = findViewById(R.id.IMSdkVersion);
-        imv.setText("IM SDK Version:" + UrlBuilder.VERSION);
+        imv.setText("IM SDK Version:" + AerServSdk.getSdkVersion());
 
     }
 

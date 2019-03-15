@@ -3,14 +3,12 @@ package com.mopub.mobileads;
 import android.app.Activity;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
-import android.text.TextUtils;
 import android.util.Log;
 
 import com.aerserv.sdk.AerServConfig;
 import com.aerserv.sdk.AerServEvent;
 import com.aerserv.sdk.AerServEventListener;
 import com.aerserv.sdk.AerServInterstitial;
-import com.aerserv.sdk.AerServSdk;
 import com.aerserv.sdk.AerServVirtualCurrency;
 import com.mopub.common.BaseLifecycleListener;
 import com.mopub.common.LifecycleListener;
@@ -43,12 +41,7 @@ public class AerServCustomEventRewardedInterstitial extends CustomEventRewardedV
      * Some instances of acceptable properties that can be passed from the JSON-formatted string set up
      * on MoPub's end. The key-value's key are arbitrarily defined, but must be kept consistent.
      */
-    private static final String KEYWORDS = "keywords";
     private static final String PLACEMENT = "placement";
-    private static final String TIMEOUT_MILLIS = "timeoutMillis";
-    private static final String SITE_ID = "siteId";
-    private static final String REWARDED_VIDEO_CURRENCY_NAME_KEY = "Rewarded-Video-Currency-Name";
-    private static final String REWARDED_VIDEO_CURRENCY_VALUE_KEY = "Rewarded-Video-Currency-Value-String";
 
     /**
      *  Required state to maintain this class. PlacementId cannot be null since AerServ requires it
@@ -61,22 +54,9 @@ public class AerServCustomEventRewardedInterstitial extends CustomEventRewardedV
     private boolean isLoaded = false;
     private boolean isInitialized = false;
 
-    /*  Deprecated in MoPub SDK v4.12. */
-    private CustomEventRewardedVideoListener aerServListener = null;
-
     /* For internal consistency measures. */
     private static final Object lock = new Object();
 
-    /**
-     * MoPub's access to AerServ SDK's listener that needs to be callable for registering events.
-     *
-     * @return CustomEventRewardedVideoListener implements AerServListener and CustomEventRewardedVideoListener
-     */
-    @Nullable
-    @Override
-    protected CustomEventRewardedVideoListener getVideoListenerForSdk() {
-        return aerServListener;
-    }
 
     /**
      * AerServ supports pause/play capabilities that should occur when the view is out of sight.
@@ -162,28 +142,27 @@ public class AerServCustomEventRewardedInterstitial extends CustomEventRewardedV
             }
             Log.d(LOG_TAG, "Placement ID is: " + placementId);
 
-            AerServConfig aerServConfig = new AerServConfig(activity, placementId);
-            Integer timeoutMillis = AerServPluginUtil.getInteger(TIMEOUT_MILLIS,
-                    localExtras, serverExtras);
+            AerServBidder aerServBidder = AerServBidder.getInstance();
 
-            if (timeoutMillis != null) {
-                Log.d(LOG_TAG, "Timeout is set to " + timeoutMillis + " ms.");
-                aerServConfig.setTimeout(timeoutMillis);
+            aerServInterstitial = (AerServInterstitial) aerServBidder.getAdForPlacement(placementId);
+            if( aerServInterstitial != null){
+                Log.d(LOG_TAG,"Aerserv rewarded video ad already loaded, skipping the loading part");
+                aerServBidder.setListenerForPlacement(placementId, "rewarded_video");
+                MoPubRewardedVideoManager.onRewardedVideoLoadSuccess(
+                        AerServCustomEventRewardedInterstitial.class,
+                        placementId);
+                isLoaded = true;
+                //reseting the aerserv bid object and aerserv bid listener
+                aerServBidder.removeAdForPlacement(placementId);
             }
+            else{
+                AerServConfig aerServConfig = new AerServConfig(activity, placementId);
 
-            List<String> keywords = AerServPluginUtil.getStringList(KEYWORDS,
-                    localExtras,
-                    serverExtras);
-            if (keywords != null) {
-                Log.d(LOG_TAG, "Keywords are set to " + keywords.toString());
-                aerServConfig.setKeywords(keywords);
+                aerServConfig
+                        .setEventListener(new AerServCustomEventRewardedInterstitialListener())
+                        .setPreload(true);
+                aerServInterstitial = new AerServInterstitial(aerServConfig);
             }
-
-            aerServListener = createAerServCustomEventRewardedInterstitialListener();
-            aerServConfig
-                    .setEventListener((AerServEventListener) aerServListener)
-                    .setPreload(true);
-            aerServInterstitial = new AerServInterstitial(aerServConfig);
         }
     }
 
@@ -234,16 +213,6 @@ public class AerServCustomEventRewardedInterstitial extends CustomEventRewardedV
     }
 
     /**
-     * Creates the AerServ event listener that will be called by MoPub's SDK to events involving this adunit.
-     * Deprecated in MoPub SDK v4.12
-     *
-     * @return CustomEventRewardedVideoListener implements AerServListener and CustomEventRewardedVideoListener
-     */
-    private CustomEventRewardedVideoListener createAerServCustomEventRewardedInterstitialListener() {
-        return new AerServCustomEventRewardedInterstitialListener();
-    }
-
-    /**
      * Implementation of a listener that will be called by MoPub's SDK in any events for a mediated adunit. This example
      * is sufficient for handling AerServ events, but may be customized to see any events for the publisher's needs i.e.
      * VIDEO_LOADED, VIDEO_25 and VIDEO_100 etc. CustomEventRewardVideoListener was deprecated in MoPub SDK v4.12
@@ -252,7 +221,7 @@ public class AerServCustomEventRewardedInterstitial extends CustomEventRewardedV
      * @see <a href="https://support.aerserv.com/hc/en-us/articles/204159160-Android-SDK-Integration-Version-2-40-4">
      *     https://support.aerserv.com/hc/en-us/articles/204159160-Android-SDK-Integration-Version-2-40-4</a>
      */
-    private class AerServCustomEventRewardedInterstitialListener implements AerServEventListener, CustomEventRewardedVideoListener {
+    private class AerServCustomEventRewardedInterstitialListener implements AerServEventListener {
 
         @Override
         public void onAerServEvent(AerServEvent aerServEvent, List<Object> args) {
