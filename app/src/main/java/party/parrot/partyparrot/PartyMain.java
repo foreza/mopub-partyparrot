@@ -30,6 +30,8 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
     public String bannerAdUnitID =  "549952a8447d4911b8d690c21b66abac";
     public String interstitialAdUnitId = "2beb37597378451f85ef0bfba0cd7908";
+
+    public Boolean supportAB = true;
     public String AB_BannerPLC = "1064948";
     public String AB_InterstitialPLC = "1064949";
 
@@ -82,7 +84,31 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     }
 
 
-    public void IMAB_updateBidForBanner(View view){
+
+    public void loadBanner(View view){
+        if (supportAB) {
+            IMAB_updateBidForBanner();
+            Log.d(log, "loadBanner -> Banner Loading, support Audience Bidder");
+        } else {
+            moPubView.loadAd();
+            Log.d(log, "loadBanner -> Banner Loading");
+        }
+    }
+
+    public void loadInterstitial(View view) {
+        if (supportAB){
+            IMAB_updateBidForInterstitial();
+            Log.d(log, "loadInterstitial -> Interstitial Loading, support Audience Bidder");
+
+        } else {
+            mInterstitial.load();
+            Log.d(log, "loadInterstitial -> Interstitial Loading");
+        }
+    }
+
+
+    // Method for Audience bidder for banners
+    public void IMAB_updateBidForBanner(){
 
         if (moPubView != null) {
             inMobiAudienceBidder.updateBid(this, AB_BannerPLC, moPubView, new IMAudienceBidder.IMAudienceBidderBannerListener() {
@@ -109,22 +135,36 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
     }
 
+    // Method for updating the Audience bidder for interstitials
+    public void IMAB_updateBidForInterstitial(){
 
-    // This method will
-    public void loadBanner(View view){
-        if (moPubView != null) {
-            moPubView.loadAd();
-            Log.d(log, "loadBanner -> Banner Loading");
-        }
-    }
-
-
-    public void loadInterstitial(View view) {
         if (mInterstitial != null){
-            mInterstitial.load();
-            Log.d(log, "loadInterstitial -> Interstitial Loading");
+            inMobiAudienceBidder.updateBid(this, AB_InterstitialPLC, mInterstitial, new IMAudienceBidder.IMAudienceBidderInterstitialListener(){
+
+                @Override
+                public void onBidRecieved(@NonNull final MoPubInterstitial moPubInterstitial) {
+                    moPubInterstitial.load();
+                    Log.d(log, "IMAB_updateBidForInterstitial - onBidRecieved");
+                }
+
+                @Override
+                public void onBidFailed(@NonNull MoPubInterstitial moPubInterstitial, @NonNull final Error error) {
+                    moPubInterstitial.load();
+                    Log.d(log, "IMAB_updateBidForInterstitial - onBidFailed");
+                }
+
+            });
+
+            Log.d(log, "IMAB_updateBidForInterstitial - loadInterstitial AB -> Interstitial Loading for Audience Bidder");
+        } else {
+            Log.d(log, "IMAB_updateBidForInterstitial FAILED - mInterstitial should be initialized first");
+
         }
+
     }
+
+
+
 
 
 
