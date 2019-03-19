@@ -1,5 +1,6 @@
 package party.parrot.partyparrot;
 
+import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -10,10 +11,12 @@ import com.aerserv.sdk.AerServSdk;
 import com.mopub.common.MoPub;
 import com.mopub.common.SdkConfiguration;
 import com.mopub.common.SdkInitializationListener;
-import com.mopub.common.logging.MoPubLog;
 import com.mopub.mobileads.MoPubErrorCode;
 import com.mopub.mobileads.MoPubInterstitial;
 import com.mopub.mobileads.MoPubView;
+
+import com.inmobi.plugin.mopub.IMAudienceBidder;        // Required for IM AB
+
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,9 +25,14 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
     private MoPubView moPubView;
     private MoPubInterstitial mInterstitial;
+    private IMAudienceBidder inMobiAudienceBidder;
     public static String log = "PARROT";
+
     public String bannerAdUnitID =  "549952a8447d4911b8d690c21b66abac";
     public String interstitialAdUnitId = "2beb37597378451f85ef0bfba0cd7908";
+    public String AB_BannerPLC = "1064948";
+    public String AB_InterstitialPLC = "1064949";
+
 
 
     @Override
@@ -38,6 +46,10 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         MoPub.initializeSdk(this, sdkConfiguration, initSdkListener());
         AerServSdk.init(this, "1017084");
         getDisplaySDKVersions();
+
+
+        inMobiAudienceBidder = IMAudienceBidder.getInstance();     // Get the singleton instance of the IMAB
+
 
         moPubView = (MoPubView) findViewById(R.id.adview);
         moPubView.setBannerAdListener(this);
@@ -70,11 +82,39 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     }
 
 
+    public void IMAB_updateBidForBanner(View view){
+
+        if (moPubView != null) {
+            inMobiAudienceBidder.updateBid(this, AB_BannerPLC, moPubView, new IMAudienceBidder.IMAudienceBidderBannerListener() {
+
+                @Override
+                public void onBidRecieved(@NonNull final MoPubView moPubAdView) {
+                    moPubView = moPubAdView;
+                    moPubView.loadAd();
+                    Log.d(log, "IMAB_updateBidForBanner - onBidRecieved");
+                }
+
+                @Override
+                public void onBidFailed(@NonNull MoPubView moPubAdView, @NonNull final Error error) {
+                    moPubView.loadAd();
+                    Log.d(log, "IMAB_updateBidForBanner - onBidFailed");
+                }
+
+            });
+            Log.d(log, "IMAB_updateBidForBanner - loadBanner AB -> Banner Loading for Audience Bidder");
+        } else {
+            Log.d(log, "IMAB_updateBidForBanner FAILED - moPubView should be initialized and added to view");
+        }
+
+
+    }
+
+
+    // This method will
     public void loadBanner(View view){
         if (moPubView != null) {
             moPubView.loadAd();
             Log.d(log, "loadBanner -> Banner Loading");
-
         }
     }
 
