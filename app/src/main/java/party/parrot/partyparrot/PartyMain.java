@@ -20,6 +20,8 @@ import com.inmobi.plugin.mopub.IMAudienceBidder;        // Required for IM AB
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdListener, MoPubInterstitial.InterstitialAdListener {
 
@@ -32,6 +34,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     public String interstitialAdUnitId = "2beb37597378451f85ef0bfba0cd7908";
 
     public Boolean supportAB = true;
+    public Boolean firstAdLoad = true;             // A bool to let us know that the first ad load has completed.
     public String AB_BannerPLC = "1064948";
     public String AB_InterstitialPLC = "1064949";
 
@@ -47,6 +50,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
         MoPub.initializeSdk(this, sdkConfiguration, initSdkListener());
         AerServSdk.init(this, "1017084");
+
         getDisplaySDKVersions();
 
 
@@ -135,6 +139,33 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
     }
 
+
+    public void IMAB_updateBidForBannerRefresh(){
+
+        if (moPubView != null) {
+            inMobiAudienceBidder.updateBid(this, AB_BannerPLC, moPubView, new IMAudienceBidder.IMAudienceBidderBannerListener() {
+
+                @Override
+                public void onBidRecieved(@NonNull final MoPubView moPubAdView) {
+                    moPubView = moPubAdView;
+                    Log.d(log, "IMAB_updateBidForBannerRefresh - onBidRecieved");
+                }
+
+                @Override
+                public void onBidFailed(@NonNull MoPubView moPubAdView, @NonNull final Error error) {
+                     moPubView.loadAd();
+                    Log.d(log, "IMAB_updateBidForBannerRefresh - onBidFailed");
+                }
+
+            });
+            Log.d(log, "IMAB_updateBidForBanner - loadBanner AB -> Banner Loading for Audience Bidder");
+        } else {
+            Log.d(log, "IMAB_updateBidForBanner FAILED - moPubView should be initialized and added to view");
+        }
+
+
+    }
+
     // Method for updating the Audience bidder for interstitials
     public void IMAB_updateBidForInterstitial(){
 
@@ -168,15 +199,43 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
 
 
-
     // Sent when the banner has successfully retrieved an ad.
     public void onBannerLoaded(MoPubView banner){
-        Log.d(log, "Banner Loaded");
+        Log.d(log, "Banner Loaded with KW: " + moPubView.getKeywords());
+
+        if (!firstAdLoad) {     // If this is NOT our first ad load
+            Log.d(log, "onBannerLoaded, not my first bid!");
+            IMAB_updateBidForBannerRefresh();
+        } else {
+            Log.d(log, "onBannerLoaded, my little first bid!");
+            delayedUpdateBid();
+            firstAdLoad = false;
+        }
+
     }
+
+
+    public void delayedUpdateBid(){
+
+        Timer timer = new Timer();
+        timer.schedule(new TimerTask() {
+
+            @Override
+            public void run() {
+                IMAB_updateBidForBannerRefresh();
+            }
+        }, 5000);
+
+    }
+
 
     // Sent when the banner has failed to retrieve an ad. You can use the MoPubErrorCode value to diagnose the cause of failure.
     public void onBannerFailed(MoPubView banner, MoPubErrorCode errorCode){
         Log.d(log, "Banner failed to load, " + errorCode);
+
+        // IMAB_updateBidForBanner(); // JC: The issue with this approach is that it'll restart the waterfall.
+        IMAB_updateBidForBannerRefresh();
+        Log.d(log, "onBannerFailed, updating AudienceBidder");
 
     }
 
@@ -189,12 +248,14 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     // Sent when the banner has just taken over the screen.
     public void onBannerExpanded(MoPubView banner){
         Log.d(log, "Banner expanded");
+        moPubView.setAutorefreshEnabled(false);
 
     }
 
     // Sent when an expanded banner has collapsed back to its original size.
     public void onBannerCollapsed(MoPubView banner){
         Log.d(log, "Banner collapsed");
+        moPubView.setAutorefreshEnabled(true);
 
     }
 

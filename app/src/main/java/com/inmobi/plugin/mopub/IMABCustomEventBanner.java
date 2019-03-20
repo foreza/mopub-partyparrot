@@ -129,6 +129,26 @@ public class IMABCustomEventBanner extends CustomEventBanner {
                     break;
                 case AD_LOADED:
                     break;
+                case AD_EXPANDED:
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (mBannerListener != null) {
+                                mBannerListener.onBannerExpanded();
+                            }
+                        }
+                    });
+                    break;
+                case AD_COLLAPSED:
+                    handler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (mBannerListener != null) {
+                                mBannerListener.onBannerCollapsed();
+                            }
+                        }
+                    });
+                    break;
                 case AD_CLICKED:
                     handler.post(new Runnable() {
                         @Override
