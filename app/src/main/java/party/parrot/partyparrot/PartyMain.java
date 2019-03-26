@@ -214,7 +214,6 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
     }
 
-
     public void delayedUpdateBid(){
 
         Timer timer = new Timer();
