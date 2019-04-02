@@ -12,6 +12,7 @@ import com.aerserv.sdk.AerServEventListener;
 import com.aerserv.sdk.AerServInterstitial;
 import com.aerserv.sdk.AerServTransactionInformation;
 import com.aerserv.sdk.AerServVirtualCurrency;
+import com.inmobi.ads.core.AdTypes;
 import com.mopub.common.LifecycleListener;
 import com.mopub.common.MoPubReward;
 import com.mopub.mobileads.CustomEventRewardedVideo;
@@ -20,6 +21,7 @@ import com.mopub.mobileads.MoPubRewardedVideoManager;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
 
 public class IMABCustomEventRewarded extends CustomEventRewardedVideo {
 
@@ -45,7 +47,7 @@ public class IMABCustomEventRewarded extends CustomEventRewardedVideo {
     @Override
     protected boolean checkAndInitializeSdk(@NonNull Activity activity,
                                             @NonNull Map<String, Object> localExtras,
-                                            @NonNull Map<String, String> serverExtras) throws Exception {
+                                            @NonNull Map<String, String> serverExtras) {
         return true;
     }
 
@@ -94,8 +96,12 @@ public class IMABCustomEventRewarded extends CustomEventRewardedVideo {
 
         public static final Handler handler = new Handler(Looper.getMainLooper());
 
+        @Nullable
         private AerServInterstitial mAerServInterstitial = null;
+        @Nullable
         private String mAdUnit = null;
+        @Nullable
+        private Timer mTask = null;
 
         @NonNull
         private final String mPlacement;
@@ -112,17 +118,21 @@ public class IMABCustomEventRewarded extends CustomEventRewardedVideo {
             mAerServInterstitial = aerServInterstitial;
         }
 
+        void setTimer(@Nullable Timer timeoutTimer) {
+            mTask = timeoutTimer;
+        }
+
         @Override
         public void onAerServEvent(AerServEvent aerServEvent, final List<Object> args) {
             switch(aerServEvent) {
-                case VC_READY:
-                    break;
-                case PRELOAD_READY:
-                    break;
                 case AD_FAILED:
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
+                            if (mTask != null) {
+                                mTask.cancel();
+                            }
+
                             if (mAdUnit != null) {
                                 MoPubRewardedVideoManager.onRewardedVideoLoadFailure(IMABCustomEventRewarded.class, mPlacement, MoPubErrorCode.NETWORK_INVALID_STATE);
                             } else {
@@ -161,13 +171,26 @@ public class IMABCustomEventRewarded extends CustomEventRewardedVideo {
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
+                            if (mTask != null) {
+                                mTask.cancel();
+                            }
+
                             if (args.get(0) instanceof AerServTransactionInformation) {
                                 AerServTransactionInformation transactionInformation = (AerServTransactionInformation) args.get(0);
-                                String bidKeyword = IMAudienceBidder.getBidKeyword(transactionInformation);
+                                String bidKeyword = IMAudienceBidder.getBidKeyword(transactionInformation.getBuyerPrice().doubleValue(), AdTypes.INT);
+                                String granularBidKeyword = IMAudienceBidder.getGranularBidKeyword(transactionInformation.getBuyerPrice().doubleValue(), AdTypes.INT);
+                                String keywords = bidKeyword.equals(granularBidKeyword) ? String.format("%s", bidKeyword) : String.format("%s,%s", bidKeyword, granularBidKeyword);
 
-                                IMAudienceBidder.IMAudienceBidderMediationSettings mediationSettings = new IMAudienceBidder.IMAudienceBidderMediationSettings(mPlacement, mAerServInterstitial, AerServRewardedListener.this);
-                                IMAudienceBidder.IMABRewardedWrapper bidObject = new IMAudienceBidder.IMABRewardedWrapper(bidKeyword, mediationSettings);
-                                mAudienceBidderListener.onBidRecieved(bidObject);
+                                if (mAerServInterstitial != null) {
+                                    IMAudienceBidder.IMAudienceBidderMediationSettings mediationSettings = new IMAudienceBidder.IMAudienceBidderMediationSettings(mPlacement, mAerServInterstitial, AerServRewardedListener.this);
+                                    IMAudienceBidder.IMABRewardedWrapper bidObject = new IMAudienceBidder.IMABRewardedWrapper(keywords, mediationSettings);
+
+                                    mAudienceBidderListener.onBidRecieved(bidObject);
+                                } else {
+                                    Error error = new Error("Something when wrong with getting the bid.");
+                                    IMAudienceBidder.IMABRewardedWrapper bidObject = new IMAudienceBidder.IMABRewardedWrapper(null, null);
+                                    mAudienceBidderListener.onBidFailed(bidObject, error);
+                                }
                             } else {
                                 Error error = new Error("Something when wrong with getting the bid.");
                                 mAudienceBidderListener.onBidFailed(new IMAudienceBidder.IMABRewardedWrapper(null, null), error);

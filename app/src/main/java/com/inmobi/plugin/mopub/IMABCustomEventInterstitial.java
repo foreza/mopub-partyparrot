@@ -4,12 +4,14 @@ import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.text.TextUtils;
 
 import com.aerserv.sdk.AerServEvent;
 import com.aerserv.sdk.AerServEventListener;
 import com.aerserv.sdk.AerServInterstitial;
 import com.aerserv.sdk.AerServTransactionInformation;
+import com.inmobi.ads.core.AdTypes;
 import com.mopub.mobileads.CustomEventInterstitial;
 import com.mopub.mobileads.MoPubErrorCode;
 import com.mopub.mobileads.MoPubInterstitial;
@@ -17,8 +19,12 @@ import com.mopub.mobileads.MoPubInterstitial;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Timer;
 
 public class IMABCustomEventInterstitial extends CustomEventInterstitial {
+
+    @NonNull
+    static final Map<String, AerServInterstitialListener> listenerMap = new HashMap<>();
 
     private AerServInterstitial aerServInterstitial = null;
 
@@ -28,11 +34,7 @@ public class IMABCustomEventInterstitial extends CustomEventInterstitial {
                                     final Map<String, Object> localExtras,
                                     final Map<String, String> serverExtras) {
         // Error checking
-        if (customEventInterstitialListener == null) {
-            throw new IllegalArgumentException("CustomEventInterstitialListener cannot be null");
-        }
-
-        if (context == null) {
+        if(context == null) {
             customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.NETWORK_INVALID_STATE);
             return;
         }
@@ -42,24 +44,26 @@ public class IMABCustomEventInterstitial extends CustomEventInterstitial {
             return;
         }
 
-        if (!localExtras.containsKey(IMAudienceBidder.LISTENER_KEY)) {
+        Object placement = localExtras.get(IMAudienceBidder.AD_KEY);
+        if (!(placement instanceof String)) {
             customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.NETWORK_INVALID_STATE);
             return;
         }
-        Object adListener = localExtras.get(IMAudienceBidder.LISTENER_KEY);
-        if (!(adListener instanceof AerServInterstitialListener)) {
-            customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.NETWORK_INVALID_STATE);
-        } else {
-            ((AerServInterstitialListener) adListener).setCustomEventInterstitialListener(customEventInterstitialListener);
-        }
 
-        if (!localExtras.containsKey(IMAudienceBidder.AD_KEY)) {
-            customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.NETWORK_NO_FILL);
+        AerServInterstitialListener adListener = listenerMap.get(placement);
+        if (adListener == null) {
+            customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.NETWORK_INVALID_STATE);
+            return;
         }
-        Object adObect = localExtras.get(IMAudienceBidder.AD_KEY);
-        if (adObect instanceof AerServInterstitial) {
-            aerServInterstitial = (AerServInterstitial) adObect;
-            customEventInterstitialListener.onInterstitialLoaded();
+        adListener.setCustomEventInterstitialListener(customEventInterstitialListener);
+        aerServInterstitial = adListener.getAerservInterstitial();
+        listenerMap.remove(placement);
+
+        if (aerServInterstitial != null) {
+            if (adListener.hasFiredLoaded) {
+                customEventInterstitialListener.onInterstitialLoaded();
+            }
+            adListener.hasFiredLoaded = true;
         } else {
             customEventInterstitialListener.onInterstitialFailed(MoPubErrorCode.NETWORK_NO_FILL);
         }
@@ -88,15 +92,23 @@ public class IMABCustomEventInterstitial extends CustomEventInterstitial {
         private AerServInterstitial mAerServInterstitial = null;
         private CustomEventInterstitialListener mInterstitialListener = null;
 
+        boolean hasFiredLoaded = false;
+
+        @NonNull
+        private final String mPlacement;
         @NonNull
         private final MoPubInterstitial mMoPubInterstitial;
         @NonNull
         private final IMAudienceBidder.IMAudienceBidderInterstitialListener mAudienceBidderListener;
+        @Nullable
+        private final Timer mTask;
 
-        AerServInterstitialListener(@NonNull MoPubInterstitial moPubInterstitial,
-                                    @NonNull IMAudienceBidder.IMAudienceBidderInterstitialListener listener) {
+        AerServInterstitialListener(@NonNull MoPubInterstitial moPubInterstitial, @NonNull String placement,
+                                    @NonNull IMAudienceBidder.IMAudienceBidderInterstitialListener listener, @Nullable Timer timeoutTimer) {
             mMoPubInterstitial = moPubInterstitial;
+            mPlacement = placement;
             mAudienceBidderListener = listener;
+            mTask = timeoutTimer;
         }
 
         void setCustomEventInterstitialListener(@NonNull CustomEventInterstitialListener customEventInterstitialListener) {
@@ -107,15 +119,14 @@ public class IMABCustomEventInterstitial extends CustomEventInterstitial {
             mAerServInterstitial = aerServInterstitial;
         }
 
+        @Nullable
+        AerServInterstitial getAerservInterstitial() {
+            return mAerServInterstitial;
+        }
+
         @Override
         public void onAerServEvent(AerServEvent aerServEvent, final List<Object> list) {
             switch (aerServEvent) {
-                case VC_READY:
-                    break;
-                case PRELOAD_READY:
-                    break;
-                case AD_LOADED:
-                    break;
                 case AD_CLICKED:
                     handler.post(new Runnable() {
                         @Override
@@ -142,13 +153,13 @@ public class IMABCustomEventInterstitial extends CustomEventInterstitial {
                         public void run() {
                             Map<String, Object> localExtras = new HashMap<>(mMoPubInterstitial.getLocalExtras());
                             localExtras.remove(IMAudienceBidder.AD_KEY);
-                            localExtras.remove(IMAudienceBidder.LISTENER_KEY);
                             mMoPubInterstitial.setLocalExtras(localExtras);
                             String keywords = mMoPubInterstitial.getKeywords();
-                            mMoPubInterstitial.setKeywords(IMAudienceBidder.removeIMKeyword(keywords));
+                            mMoPubInterstitial.setKeywords(IMAudienceBidder.removeIMKeywords(keywords));
                             if (mInterstitialListener != null) {
                                 mInterstitialListener.onInterstitialImpression();
                             }
+
                         }
                     });
                     break;
@@ -156,10 +167,12 @@ public class IMABCustomEventInterstitial extends CustomEventInterstitial {
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
-                            Map<String, Object> localExtras = new HashMap<>(mMoPubInterstitial.getLocalExtras());
-                            localExtras.remove(IMAudienceBidder.AD_KEY);
-                            localExtras.remove(IMAudienceBidder.LISTENER_KEY);
-                            mMoPubInterstitial.setLocalExtras(localExtras);
+                            if (mTask != null) {
+                                mTask.cancel();
+                            }
+
+                            listenerMap.remove(mPlacement);
+
                             if (mInterstitialListener != null) {
                                 mInterstitialListener.onInterstitialFailed(MoPubErrorCode.NETWORK_NO_FILL);
                             } else {
@@ -173,11 +186,14 @@ public class IMABCustomEventInterstitial extends CustomEventInterstitial {
                     handler.post(new Runnable() {
                         @Override
                         public void run() {
+                            if (mTask != null) {
+                                mTask.cancel();
+                            }
+
+                            String oldkeyword = mMoPubInterstitial.getKeywords();
+
                             if (mAerServInterstitial != null) {
-                                Map<String, Object> localExtras = new HashMap<>(mMoPubInterstitial.getLocalExtras());
-                                localExtras.put(IMAudienceBidder.AD_KEY, mAerServInterstitial);
-                                localExtras.put(IMAudienceBidder.LISTENER_KEY, AerServInterstitialListener.this);
-                                mMoPubInterstitial.setLocalExtras(localExtras);
+                                listenerMap.put(mPlacement, AerServInterstitialListener.this);
 
                                 AerServTransactionInformation transactionInformation = null;
                                 if (list.get(0) instanceof AerServTransactionInformation) {
@@ -185,28 +201,23 @@ public class IMABCustomEventInterstitial extends CustomEventInterstitial {
                                 }
 
                                 if (transactionInformation != null) {
-                                    String keyword = IMAudienceBidder.getBidKeyword(transactionInformation);
-                                    String oldKeyword = mMoPubInterstitial.getKeywords();
-                                    if (!TextUtils.isEmpty(oldKeyword)) {
-                                        mMoPubInterstitial.setKeywords(String.format("%s,%s", oldKeyword, keyword));
+                                    String keyword = IMAudienceBidder.getBidKeyword(transactionInformation.getBuyerPrice().doubleValue(), AdTypes.INT);
+                                    String granularKeyword = IMAudienceBidder.getGranularBidKeyword(transactionInformation.getBuyerPrice().doubleValue(), AdTypes.INT);
+                                    if (TextUtils.isEmpty(oldkeyword)) {
+                                        mMoPubInterstitial.setKeywords(keyword.equals(granularKeyword) ? String.format("%s", keyword) : String.format("%s,%s", keyword, granularKeyword));
                                     } else {
-                                        mMoPubInterstitial.setKeywords(keyword);
+                                        mMoPubInterstitial.setKeywords(keyword.equals(granularKeyword) ? String.format("%s,%s", oldkeyword, keyword) : String.format("%s,%s,%s", oldkeyword, keyword, granularKeyword));
                                     }
                                 }
-                                handler.post(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        mAudienceBidderListener.onBidRecieved(mMoPubInterstitial);
-                                    }
-                                });
+
+                                mAudienceBidderListener.onBidRecieved(mMoPubInterstitial);
+                                if (mInterstitialListener != null) {
+                                    mInterstitialListener.onInterstitialLoaded();
+                                }
+                                hasFiredLoaded = true;
                             } else {
-                                handler.post(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        Error error=  new Error("Something when wrong with getting the bid.");
-                                        mAudienceBidderListener.onBidFailed(mMoPubInterstitial, error);
-                                    }
-                                });
+                                Error error = new Error("Something when wrong with getting the bid.");
+                                mAudienceBidderListener.onBidFailed(mMoPubInterstitial, error);
                             }
                         }
                     });
@@ -220,6 +231,7 @@ public class IMABCustomEventInterstitial extends CustomEventInterstitial {
                             }
                         }
                     });
+                    break;
             }
         }
     }
