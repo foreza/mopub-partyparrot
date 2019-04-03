@@ -1,6 +1,11 @@
 package party.parrot.partyparrot;
 
+import android.content.Context;
+import android.os.Debug;
+import android.os.Handler;
+import android.os.Looper;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -8,9 +13,14 @@ import android.view.View;
 import android.widget.TextView;
 
 import com.aerserv.sdk.AerServSdk;
+import com.amazon.device.ads.DTBAdResponse;
+import com.inmobi.ads.InMobiAudienceBidder;
+import com.inmobi.plugin.mopub.IMABCustomEventBanner;
 import com.mopub.common.MoPub;
 import com.mopub.common.SdkConfiguration;
 import com.mopub.common.SdkInitializationListener;
+import com.mopub.common.logging.MoPubDefaultLogger;
+import com.mopub.common.logging.MoPubLog;
 import com.mopub.mobileads.MoPubErrorCode;
 import com.mopub.mobileads.MoPubInterstitial;
 import com.mopub.mobileads.MoPubView;
@@ -22,22 +32,29 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.logging.Level;
 
 public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdListener, MoPubInterstitial.InterstitialAdListener {
 
-    private MoPubView moPubView;
-    private MoPubInterstitial mInterstitial;
-    private IMAudienceBidder inMobiAudienceBidder;
-    public static String log = "PARROT";
+    /* MoPub standard integration variables */
 
-    public String bannerAdUnitID =  "549952a8447d4911b8d690c21b66abac";
-    public String interstitialAdUnitId = "2beb37597378451f85ef0bfba0cd7908";
+    private MoPubView moPubView;                                                // MoPub banner view
+    private MoPubInterstitial mInterstitial;                                    // MoPub interstitial view
+    public String bannerAdUnitID = "549952a8447d4911b8d690c21b66abac";         // MoPub banner ad unit for 'Party Parrot' test app
+    public String interstitialAdUnitId = "2beb37597378451f85ef0bfba0cd7908";    // Mopub interstitial ad unit for 'Party Parrot' test app
+    public static String log = "PARROT";                                        // Log tag for ease of debugging
 
-    public Boolean supportAB = true;
-    public Boolean firstAdLoad = true;             // A bool to let us know that the first ad load has completed.
-    public String AB_BannerPLC = "1064948";
-    public String AB_InterstitialPLC = "1064949";
+    /* IMAB required integration items */
 
+    private IMAudienceBidder inMobiAudienceBidder;                              // Recommended we keep a reference to the IMAudienceBidder singleton
+
+
+    public String AB_BannerPLC = "1064948";                                // InMobi AerServ platform Banner PLC to update the banner bid parameter
+    public String AB_InterstitialPLC = "1064877";                               // InMobi AerServ platform Interstitial PLC to update the banner bid parameter
+    private IMAudienceBidder.BidToken bannerBidToken = null;                    //
+
+    public Boolean supportAB = true;                                            // Be able to toggle on / off Audience Bidder functionality.
+    public Boolean bannerRefreshing = false;                                        // State variable to track the IMAB response
 
 
     @Override
@@ -45,59 +62,103 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_party_main);
 
+
+        initializeAdSDK();
+
+        configureBanner();
+        // configureInterstitial();
+
+        getDisplaySDKVersions();        // Update the view!
+    }
+
+
+    // Initialize any SDKs in this step
+    public void initializeAdSDK() {
+
+        // Required for MoPub integration
         SdkConfiguration sdkConfiguration = new SdkConfiguration.Builder(bannerAdUnitID)
+                .withLogLevel(MoPubLog.LogLevel.DEBUG)
                 .build();
-
         MoPub.initializeSdk(this, sdkConfiguration, initSdkListener());
-        AerServSdk.init(this, "1017084");
 
-        getDisplaySDKVersions();
-
-
+        // Required for InMobi Audience Bidder integrations
+        InMobiAudienceBidder.initialize(this, "1017084");
         inMobiAudienceBidder = IMAudienceBidder.getInstance();     // Get the singleton instance of the IMAB
 
+    }
+
+    // Call this once to initially configure the banner
+    public void configureBanner() {
+
+        Log.d(log, "configureBanner called.");
 
         moPubView = (MoPubView) findViewById(R.id.adview);
         moPubView.setBannerAdListener(this);
         moPubView.setAdUnitId(bannerAdUnitID);
 
-        mInterstitial = new MoPubInterstitial(this, interstitialAdUnitId);
-        mInterstitial.setInterstitialAdListener(this);
-    }
-
-    public void getDisplaySDKVersions(){
-
-        TextView mpv = findViewById(R.id.MPSdkVersion);
-        mpv.setText("MoPub SDK Version:" + MoPub.SDK_VERSION);
-
-        TextView imv = findViewById(R.id.IMSdkVersion);
-        imv.setText("IM SDK Version:" + AerServSdk.getSdkVersion());
-
     }
 
 
-    private SdkInitializationListener initSdkListener() {
-        return new SdkInitializationListener() {
+    // Will update the banner bid for the IMAB class.
+    public void updateIMABForBanner() {
+
+        Log.d(log, "updateIMABForBanner has been called.");
+
+        // Update the bid and save it to the bid token
+        bannerBidToken = inMobiAudienceBidder.updateBid(this, AB_BannerPLC, moPubView, new IMAudienceBidder.IMAudienceBidderBannerListener() {
+
             @Override
-            public void onInitializationFinished() {
-                //  MoPub SDK initialized.
-                Log.d(log, "MoPub SDK initialized");
+            public void onBidRecieved(@NonNull final MoPubView m) {
+                Log.d(log, "updateIMABForBanner - onBidRecieved. moPubAdView updated. Ready to load banner.");
+
+                if (!bannerRefreshing) {
+                    Log.d(log, "updateIMABForBanner - !bannerRefreshing, so loading Ad to begin mopub refresh.");
+                    bannerRefreshing = true;
+                    m.loadAd();
+                }
+            }
+
+            @Override
+            public void onBidFailed(@NonNull MoPubView m, @NonNull final Error error) {
+                Log.d(log, "updateIMABForBanner - onBidFailed. Ready to load banner.");
+
+                if (!bannerRefreshing) {
+                    Log.d(log, "updateIMABForBanner - !bannerRefreshing, so loading Ad to begin mopub refresh.");
+                    bannerRefreshing = true;
+                    m.loadAd();
+                }
 
             }
-        };
+
+        });
+        Log.d(log, "updateIMABForBanner - loadBanner AB -> Banner Loading for Audience Bidder");
     }
 
 
 
+    /* Touch event for loading banner */
     public void loadBanner(View view){
-        if (supportAB) {
-            IMAB_updateBidForBanner();
-            Log.d(log, "loadBanner -> Banner Loading, support Audience Bidder");
-        } else {
-            moPubView.loadAd();
-            Log.d(log, "loadBanner -> Banner Loading");
-        }
+
+        Log.d(log, "loadBanner called.");
+        updateIMABForBanner();
     }
+
+
+
+
+    public void configureInterstitial(){
+
+        Log.d(log, "configureInterstitial called.");
+
+        mInterstitial = new MoPubInterstitial(this, interstitialAdUnitId);
+        mInterstitial.setInterstitialAdListener(this);
+
+        // Audience Bidder
+        /* Do something here */
+
+    }
+
+
 
     public void loadInterstitial(View view) {
         if (supportAB){
@@ -111,60 +172,6 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     }
 
 
-    // Method for Audience bidder for banners
-    public void IMAB_updateBidForBanner(){
-
-        if (moPubView != null) {
-            inMobiAudienceBidder.updateBid(this, AB_BannerPLC, moPubView, new IMAudienceBidder.IMAudienceBidderBannerListener() {
-
-                @Override
-                public void onBidRecieved(@NonNull final MoPubView moPubAdView) {
-                    moPubView = moPubAdView;
-                    moPubView.loadAd();
-                    Log.d(log, "IMAB_updateBidForBanner - onBidRecieved");
-                }
-
-                @Override
-                public void onBidFailed(@NonNull MoPubView moPubAdView, @NonNull final Error error) {
-                    moPubView.loadAd();
-                    Log.d(log, "IMAB_updateBidForBanner - onBidFailed");
-                }
-
-            });
-            Log.d(log, "IMAB_updateBidForBanner - loadBanner AB -> Banner Loading for Audience Bidder");
-        } else {
-            Log.d(log, "IMAB_updateBidForBanner FAILED - moPubView should be initialized and added to view");
-        }
-
-
-    }
-
-
-    public void IMAB_updateBidForBannerRefresh(){
-
-        if (moPubView != null) {
-            inMobiAudienceBidder.updateBid(this, AB_BannerPLC, moPubView, new IMAudienceBidder.IMAudienceBidderBannerListener() {
-
-                @Override
-                public void onBidRecieved(@NonNull final MoPubView moPubAdView) {
-                    moPubView = moPubAdView;
-                    Log.d(log, "IMAB_updateBidForBannerRefresh - onBidRecieved");
-                }
-
-                @Override
-                public void onBidFailed(@NonNull MoPubView moPubAdView, @NonNull final Error error) {
-                     moPubView.loadAd();
-                    Log.d(log, "IMAB_updateBidForBannerRefresh - onBidFailed");
-                }
-
-            });
-            Log.d(log, "IMAB_updateBidForBanner - loadBanner AB -> Banner Loading for Audience Bidder");
-        } else {
-            Log.d(log, "IMAB_updateBidForBanner FAILED - moPubView should be initialized and added to view");
-        }
-
-
-    }
 
     // Method for updating the Audience bidder for interstitials
     public void IMAB_updateBidForInterstitial(){
@@ -202,39 +209,21 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     // Sent when the banner has successfully retrieved an ad.
     public void onBannerLoaded(MoPubView banner){
         Log.d(log, "Banner Loaded with KW: " + moPubView.getKeywords());
-
-        if (!firstAdLoad) {     // If this is NOT our first ad load
-            Log.d(log, "onBannerLoaded, not my first bid!");
-            IMAB_updateBidForBannerRefresh();
-        } else {
-            Log.d(log, "onBannerLoaded, my little first bid!");
-            delayedUpdateBid();
-            firstAdLoad = false;
-        }
+        // Update the bid right after the banner has been loaded.
+        bannerBidToken.refreshBid(this, null, 5000);
 
     }
 
-    public void delayedUpdateBid(){
-
-        Timer timer = new Timer();
-        timer.schedule(new TimerTask() {
-
-            @Override
-            public void run() {
-                IMAB_updateBidForBannerRefresh();
-            }
-        }, 5000);
-
-    }
 
 
     // Sent when the banner has failed to retrieve an ad. You can use the MoPubErrorCode value to diagnose the cause of failure.
     public void onBannerFailed(MoPubView banner, MoPubErrorCode errorCode){
         Log.d(log, "Banner failed to load, " + errorCode);
 
-        // IMAB_updateBidForBanner(); // JC: The issue with this approach is that it'll restart the waterfall.
-        IMAB_updateBidForBannerRefresh();
-        Log.d(log, "onBannerFailed, updating AudienceBidder");
+        // Update the bid right after the banner has failed.
+        bannerBidToken.refreshBid(this, null, 5000);
+
+
 
     }
 
@@ -257,6 +246,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         moPubView.setAutorefreshEnabled(true);
 
     }
+
 
 
     // InterstitialAdListener methods
@@ -306,6 +296,28 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         super.onDestroy();
     }
 
+
+    public void getDisplaySDKVersions(){
+
+        TextView mpv = findViewById(R.id.MPSdkVersion);
+        mpv.setText("MoPub SDK Version:" + MoPub.SDK_VERSION);
+
+        TextView imv = findViewById(R.id.IMSdkVersion);
+        imv.setText("IM SDK Version:" + AerServSdk.getSdkVersion());
+
+    }
+
+
+    private SdkInitializationListener initSdkListener() {
+        return new SdkInitializationListener() {
+            @Override
+            public void onInitializationFinished() {
+                //  MoPub SDK initialized.
+                Log.d(log, "MoPub SDK initialized");
+
+            }
+        };
+    }
 
 
 
