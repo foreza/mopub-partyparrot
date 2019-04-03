@@ -438,7 +438,7 @@ public class IMAudienceBidder {
                     .setUseHeaderBidding(true);
 
             if (!TextUtils.isEmpty(userId)) {
-                    aerServConfig.setUserId(userId);
+                aerServConfig.setUserId(userId);
             }
 
             if (dtbAdResponse != null) {

@@ -13,7 +13,13 @@ import android.view.View;
 import android.widget.TextView;
 
 import com.aerserv.sdk.AerServSdk;
+
+import com.amazon.device.ads.AdError;
+import com.amazon.device.ads.AdRegistration;
+import com.amazon.device.ads.DTBAdCallback;
+import com.amazon.device.ads.DTBAdRequest;
 import com.amazon.device.ads.DTBAdResponse;
+import com.amazon.device.ads.DTBAdSize;
 import com.inmobi.ads.InMobiAudienceBidder;
 import com.inmobi.plugin.mopub.IMABCustomEventBanner;
 import com.mopub.common.MoPub;
@@ -49,13 +55,24 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     private IMAudienceBidder inMobiAudienceBidder;                              // Recommended we keep a reference to the IMAudienceBidder singleton
 
 
-    public String AB_BannerPLC = "1064948";                                // InMobi AerServ platform Banner PLC to update the banner bid parameter
+    public String AB_BannerPLC = "1064941";        //1064948                         // InMobi AerServ platform Banner PLC to update the banner bid parameter
     public String AB_InterstitialPLC = "1064877";                               // InMobi AerServ platform Interstitial PLC to update the banner bid parameter
     private IMAudienceBidder.BidToken bannerBidToken = null;                    //
+    private int bidTimeOut = 10000;
 
     public Boolean supportAB = true;                                            // Be able to toggle on / off Audience Bidder functionality.
     public Boolean bannerRefreshing = false;                                        // State variable to track the IMAB response
 
+    public Boolean supportAPS = true;
+
+    public String APS_Banner_APPID = "a9_onboarding_app_id";
+    public String APS_Banner_SLOTID = "5ab6a4ae-4aa5-43f4-9da4-e30755f2b295";
+
+    public String APS_Interstitial_APPID = "a9_onboarding_app_id";
+    public String APS_Interstitial_SLOTID = "4e918ac0-5c68-4fe1-8d26-4e76e8f74831";
+
+    public String APS_Video_APPID = "bd4fd892fc8b4f59bc2f6fa6c326a041";
+    public String APS_Video_SLOTID = "288ad904-d0ab-44c4-8901-0cf43b3382e6";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -71,6 +88,17 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         getDisplaySDKVersions();        // Update the view!
     }
 
+    private SdkInitializationListener initSdkListener() {
+        return new SdkInitializationListener() {
+            @Override
+            public void onInitializationFinished() {
+                //  MoPub SDK initialized.
+                Log.d(log, "MoPub SDK initialized");
+
+            }
+        };
+    }
+
 
     // Initialize any SDKs in this step
     public void initializeAdSDK() {
@@ -82,8 +110,17 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         MoPub.initializeSdk(this, sdkConfiguration, initSdkListener());
 
         // Required for InMobi Audience Bidder integrations
-        InMobiAudienceBidder.initialize(this, "1017084");
+        InMobiAudienceBidder.initialize(this, "1020421");
         inMobiAudienceBidder = IMAudienceBidder.getInstance();     // Get the singleton instance of the IMAB
+
+        // Required if APS is included
+        if (supportAPS) {
+            AdRegistration.getInstance(APS_Banner_APPID, this);
+            AdRegistration.enableLogging(true);
+            AdRegistration.enableTesting(true);
+            AdRegistration.useGeoLocation(true);
+        }
+
 
     }
 
@@ -104,49 +141,176 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
         Log.d(log, "updateIMABForBanner has been called.");
 
-        // Update the bid and save it to the bid token
-        bannerBidToken = inMobiAudienceBidder.updateBid(this, AB_BannerPLC, moPubView, new IMAudienceBidder.IMAudienceBidderBannerListener() {
+        // Create the loader and set the APS params
+        final DTBAdRequest loader = new DTBAdRequest();
+        loader.setSizes(new DTBAdSize(320, 50, APS_Banner_SLOTID));
 
+
+        // Call load and specify callbacks
+        loader.loadAd(new DTBAdCallback() {
             @Override
-            public void onBidRecieved(@NonNull final MoPubView m) {
-                Log.d(log, "updateIMABForBanner - onBidRecieved. moPubAdView updated. Ready to load banner.");
+            public void onFailure(AdError adError) {
+                Log.e(log, "updateIMABForBanner - Failed to get banner ad from Amazon: " + adError.getMessage());
 
-                if (!bannerRefreshing) {
-                    Log.d(log, "updateIMABForBanner - !bannerRefreshing, so loading Ad to begin mopub refresh.");
-                    bannerRefreshing = true;
-                    m.loadAd();
-                }
+                // Bid should continue without Amazon:
+
+                // Update the bid and save it to the bid token
+                bannerBidToken = inMobiAudienceBidder.updateBid(PartyMain.this, AB_BannerPLC, moPubView, null, new IMAudienceBidder.IMAudienceBidderBannerListener() {
+
+                    @Override
+                    public void onBidRecieved(@NonNull final MoPubView m) {
+                        Log.d(log, "updateIMABForBanner - onBidRecieved. moPubAdView updated. Ready to load banner.");
+
+                        if (!bannerRefreshing) {
+                            Log.d(log, "updateIMABForBanner - !bannerRefreshing, so loading Ad to begin mopub refresh.");
+                            bannerRefreshing = true;
+                            m.loadAd();
+                        }
+                    }
+
+                    @Override
+                    public void onBidFailed(@NonNull MoPubView m, @NonNull final Error error) {
+                        Log.d(log, "updateIMABForBanner - onBidFailed. Ready to load banner.");
+
+                        if (!bannerRefreshing) {
+                            Log.d(log, "updateIMABForBanner - !bannerRefreshing, so loading Ad to begin mopub refresh.");
+                            bannerRefreshing = true;
+                            m.loadAd();
+                        }
+
+                    }
+
+                }, bidTimeOut);
+
             }
 
             @Override
-            public void onBidFailed(@NonNull MoPubView m, @NonNull final Error error) {
-                Log.d(log, "updateIMABForBanner - onBidFailed. Ready to load banner.");
+            public void onSuccess(DTBAdResponse dtbAdResponse) {
+                Log.d(log, "updateIMABForBanner -  Did get banner ad from Amazon: " + dtbAdResponse.getAdCount());
 
-                if (!bannerRefreshing) {
-                    Log.d(log, "updateIMABForBanner - !bannerRefreshing, so loading Ad to begin mopub refresh.");
-                    bannerRefreshing = true;
-                    m.loadAd();
-                }
 
+                // Bid should now continue with Amazon:
+                bannerBidToken = inMobiAudienceBidder.updateBid(PartyMain.this, AB_BannerPLC, moPubView, dtbAdResponse, new IMAudienceBidder.IMAudienceBidderBannerListener() {
+
+                    @Override
+                    public void onBidRecieved(@NonNull final MoPubView m) {
+                        Log.d(log, "updateIMABForBanner - onBidRecieved. moPubAdView updated. Ready to load banner.");
+
+                        if (!bannerRefreshing) {
+                            Log.d(log, "updateIMABForBanner - !bannerRefreshing, so loading Ad to begin mopub refresh.");
+                            bannerRefreshing = true;
+                            m.loadAd();
+                        }
+                    }
+
+                    @Override
+                    public void onBidFailed(@NonNull MoPubView m, @NonNull final Error error) {
+                        Log.d(log, "updateIMABForBanner - onBidFailed. Ready to load banner.");
+
+                        if (!bannerRefreshing) {
+                            Log.d(log, "updateIMABForBanner - !bannerRefreshing, so loading Ad to begin mopub refresh.");
+                            bannerRefreshing = true;
+                            m.loadAd();
+                        }
+
+                    }
+                }, bidTimeOut);
             }
 
         });
-        Log.d(log, "updateIMABForBanner - loadBanner AB -> Banner Loading for Audience Bidder");
     }
 
 
-
     /* Touch event for loading banner */
-    public void loadBanner(View view){
+    public void loadBanner(View view) {
 
         Log.d(log, "loadBanner called.");
         updateIMABForBanner();
     }
 
 
+    // Function to call the DTBAdloader again on the same banner slot to get a new ad, and then refresh the banner bid token
+    public void IMAB_refreshBannerBidForAPS(){
+
+        Log.d(log, "IMAB_refreshBannerBidForAPS called");
+
+        final Handler handler = new Handler();
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+
+                Log.d(log, "IMAB_refreshBannerBidForAPS - refreshing bid now after delay");
 
 
-    public void configureInterstitial(){
+                AdRegistration.getInstance(APS_Banner_APPID, PartyMain.this);
+                AdRegistration.enableLogging(true);
+                AdRegistration.enableTesting(true);
+                AdRegistration.useGeoLocation(true);
+
+                DTBAdRequest refresher = new DTBAdRequest();
+                refresher.setSizes(new DTBAdSize(320, 50, APS_Banner_SLOTID));
+                refresher.loadAd(new DTBAdCallback() {
+                    @Override
+                    public void onFailure(AdError adError) {
+                        Log.d(log, "Refresh Bid starting w/o Amazon, Failed to get banner ad from Amazon: " + adError.getMessage());
+                        bannerBidToken.refreshBid(PartyMain.this, null, bidTimeOut);
+
+                    }
+
+                    @Override
+                    public void onSuccess(DTBAdResponse dtbAdResponse) {
+                        Log.d(log, "Refresh Bid starting w/ Amazon: " + dtbAdResponse.getAdCount());
+
+                        bannerBidToken.refreshBid(PartyMain.this, dtbAdResponse, bidTimeOut);
+                    }
+                });
+            }}, 10000);
+
+
+
+    }
+
+    // Sent when the banner has successfully retrieved an ad.
+    public void onBannerLoaded(MoPubView banner) {
+        Log.d(log, "Banner Loaded with KW: " + moPubView.getKeywords());
+
+        // We will need to make a request to A9 each time the banner refreshes.
+        IMAB_refreshBannerBidForAPS();
+
+    }
+
+
+
+    // Sent when the banner has failed to retrieve an ad. You can use the MoPubErrorCode value to diagnose the cause of failure.
+    public void onBannerFailed(MoPubView banner, MoPubErrorCode errorCode) {
+        Log.d(log, "Banner failed to load, " + errorCode);
+
+        // bannerBidToken.refreshBid(this, APS_RESPONSE, 5000);
+        IMAB_refreshBannerBidForAPS();
+    }
+
+    // Sent when the user has tapped on the banner.
+    public void onBannerClicked(MoPubView banner) {
+        Log.d(log, "Banner clicked");
+
+    }
+
+    // Sent when the banner has just taken over the screen.
+    public void onBannerExpanded(MoPubView banner) {
+        Log.d(log, "Banner expanded");
+        moPubView.setAutorefreshEnabled(false);
+
+    }
+
+    // Sent when an expanded banner has collapsed back to its original size.
+    public void onBannerCollapsed(MoPubView banner) {
+        Log.d(log, "Banner collapsed");
+        moPubView.setAutorefreshEnabled(true);
+
+    }
+
+
+    public void configureInterstitial() {
 
         Log.d(log, "configureInterstitial called.");
 
@@ -159,9 +323,8 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     }
 
 
-
     public void loadInterstitial(View view) {
-        if (supportAB){
+        if (supportAB) {
             IMAB_updateBidForInterstitial();
             Log.d(log, "loadInterstitial -> Interstitial Loading, support Audience Bidder");
 
@@ -172,12 +335,11 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     }
 
 
-
     // Method for updating the Audience bidder for interstitials
-    public void IMAB_updateBidForInterstitial(){
+    public void IMAB_updateBidForInterstitial() {
 
-        if (mInterstitial != null){
-            inMobiAudienceBidder.updateBid(this, AB_InterstitialPLC, mInterstitial, new IMAudienceBidder.IMAudienceBidderInterstitialListener(){
+        if (mInterstitial != null) {
+            inMobiAudienceBidder.updateBid(this, AB_InterstitialPLC, mInterstitial, new IMAudienceBidder.IMAudienceBidderInterstitialListener() {
 
                 @Override
                 public void onBidRecieved(@NonNull final MoPubInterstitial moPubInterstitial) {
@@ -204,51 +366,6 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
 
 
-
-
-    // Sent when the banner has successfully retrieved an ad.
-    public void onBannerLoaded(MoPubView banner){
-        Log.d(log, "Banner Loaded with KW: " + moPubView.getKeywords());
-        // Update the bid right after the banner has been loaded.
-        bannerBidToken.refreshBid(this, null, 5000);
-
-    }
-
-
-
-    // Sent when the banner has failed to retrieve an ad. You can use the MoPubErrorCode value to diagnose the cause of failure.
-    public void onBannerFailed(MoPubView banner, MoPubErrorCode errorCode){
-        Log.d(log, "Banner failed to load, " + errorCode);
-
-        // Update the bid right after the banner has failed.
-        bannerBidToken.refreshBid(this, null, 5000);
-
-
-
-    }
-
-    // Sent when the user has tapped on the banner.
-    public void onBannerClicked(MoPubView banner){
-        Log.d(log, "Banner clicked");
-
-    }
-
-    // Sent when the banner has just taken over the screen.
-    public void onBannerExpanded(MoPubView banner){
-        Log.d(log, "Banner expanded");
-        moPubView.setAutorefreshEnabled(false);
-
-    }
-
-    // Sent when an expanded banner has collapsed back to its original size.
-    public void onBannerCollapsed(MoPubView banner){
-        Log.d(log, "Banner collapsed");
-        moPubView.setAutorefreshEnabled(true);
-
-    }
-
-
-
     // InterstitialAdListener methods
 
     @Override
@@ -256,7 +373,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         // The interstitial has been cached and is ready to be shown.
 
         Log.d(log, "An Interstitial was loaded with kw: " + interstitial.getKeywords());
-            mInterstitial.show();
+        mInterstitial.show();
     }
 
     @Override
@@ -289,7 +406,6 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     }
 
 
-
     @Override
     protected void onDestroy() {
         mInterstitial.destroy();
@@ -297,7 +413,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     }
 
 
-    public void getDisplaySDKVersions(){
+    public void getDisplaySDKVersions() {
 
         TextView mpv = findViewById(R.id.MPSdkVersion);
         mpv.setText("MoPub SDK Version:" + MoPub.SDK_VERSION);
@@ -307,18 +423,6 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
     }
 
-
-    private SdkInitializationListener initSdkListener() {
-        return new SdkInitializationListener() {
-            @Override
-            public void onInitializationFinished() {
-                //  MoPub SDK initialized.
-                Log.d(log, "MoPub SDK initialized");
-
-            }
-        };
-    }
-
-
-
 }
+
+
