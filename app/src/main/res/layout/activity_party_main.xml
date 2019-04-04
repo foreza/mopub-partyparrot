@@ -25,9 +25,6 @@
         android:id="@+id/button"
         android:layout_width="170dp"
         android:layout_height="65dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginLeft="8dp"
-        android:layout_marginBottom="8dp"
         android:onClick="loadBanner"
         android:text="Load Banner"
         app:layout_constraintBottom_toTopOf="@+id/button2"
@@ -37,11 +34,17 @@
         android:id="@+id/button2"
         android:layout_width="170dp"
         android:layout_height="65dp"
-        android:layout_marginStart="8dp"
-        android:layout_marginLeft="8dp"
-        android:layout_marginBottom="50dp"
         android:onClick="loadInterstitial"
         android:text="Load Interstitial"
+        app:layout_constraintBottom_toTopOf="@+id/button3"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <Button
+        android:id="@+id/button3"
+        android:layout_width="170dp"
+        android:layout_height="65dp"
+        android:onClick="showInterstitial"
+        android:text="Show Interstitial"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 

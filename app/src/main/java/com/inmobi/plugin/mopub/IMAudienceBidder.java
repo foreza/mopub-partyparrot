@@ -117,11 +117,19 @@ public class IMAudienceBidder {
         handler = new Handler(Looper.getMainLooper());
     }
 
-    public interface BidToken {
-        void refreshBid(@NonNull Context context, @Nullable DTBAdResponse dtbAdResponse, long timeoutMillis);
+    public static abstract class BidToken {
+        DTBAdResponse dtbAdResponse = null;
+
+        public void setDTBAdResponse(DTBAdResponse dtbAdResponse) {
+            this.dtbAdResponse = dtbAdResponse;
+        }
+
+        public void updateBid(@NonNull Context context, long timeoutMillis) {
+
+        }
     }
 
-    private static class InterstitialBidToken implements BidToken {
+    private static class InterstitialBidToken extends BidToken {
 
         private final MoPubInterstitial moPubInterstitial;
         private final String placement;
@@ -137,12 +145,11 @@ public class IMAudienceBidder {
         /**
          * Object used to get an bid.
          * @param context Current context. Cannot be null.
-         * @param dtbAdResponse Amazon's ad object with bid information. Can be null
-         *         if APS did not return with an ad.
          * @param timeoutMillis Maximum time the listener has to return.
          */
         @Override
-        public void refreshBid(@NonNull Context context, @Nullable final DTBAdResponse dtbAdResponse, long timeoutMillis) {
+        public void updateBid(@NonNull Context context, long timeoutMillis) {
+            super.updateBid(context, timeoutMillis);
 
             if (TextUtils.isEmpty(placement)) {
                 Error error = new Error("Cannot update MoPubInterstitial keywords with a empty or null placement.");
@@ -241,6 +248,7 @@ public class IMAudienceBidder {
 
             if (hasValidAps) {
                 aerServConfig.setAPSAdResponses(Collections.singletonList(dtbAdResponse));
+                dtbAdResponse = null;
             }
 
             AerServInterstitial aerServInterstitial = new AerServInterstitial(aerServConfig);
@@ -248,7 +256,7 @@ public class IMAudienceBidder {
         }
     }
 
-    private static class BannerBidToken implements BidToken {
+    private static class BannerBidToken extends BidToken {
 
         private final MoPubView moPubView;
         private final String placement;
@@ -263,12 +271,12 @@ public class IMAudienceBidder {
         /**
          * Object used to get an bid.
          * @param context Current context. Cannot be null.
-         * @param dtbAdResponse Amazon's ad object with bid information. Can be null
-         *         if APS did not return with an ad.
          * @param timeoutMillis Maximum time the listener has to return.
          */
         @Override
-        public void refreshBid(@NonNull Context context, @Nullable final DTBAdResponse dtbAdResponse, long timeoutMillis) {
+        public void updateBid(@NonNull Context context, long timeoutMillis) {
+            super.updateBid(context, timeoutMillis);
+
             if (TextUtils.isEmpty(placement)) {
                 Error error = new Error("Cannot update MoPubView keywords with a empty or null placement.");
                 bidderBannerListener.onBidFailed(moPubView, error);
@@ -372,13 +380,14 @@ public class IMAudienceBidder {
 
             if (hasValidAps) {
                 aerServConfig.setAPSAdResponses(Collections.singletonList(dtbAdResponse));
+                dtbAdResponse = null;
             }
 
             aerServBanner.configure(aerServConfig);
         }
     }
 
-    private static final class RewardedBidToken implements BidToken {
+    private static final class RewardedBidToken extends BidToken {
 
         private final String userId;
         private final String placement;
@@ -394,12 +403,12 @@ public class IMAudienceBidder {
         /**
          * Object used to get an bid.
          * @param context Current context. Cannot be null.
-         * @param dtbAdResponse Amazon's ad object with bid information. Can be null
-         *         if APS did not return with an ad.
          * @param timeoutMillis Maximum time the listener has to return.
          */
         @Override
-        public void refreshBid(@NonNull Context context, @Nullable final DTBAdResponse dtbAdResponse, long timeoutMillis) {
+        public void updateBid(@NonNull Context context, long timeoutMillis) {
+            super.updateBid(context, timeoutMillis);
+
             if (TextUtils.isEmpty(placement)) {
                 Error error = new Error("Cannot update RequestParameters keywords with a empty or null placement.");
                 IMABRewardedWrapper wrapper = new IMABRewardedWrapper(null, null);
@@ -438,13 +447,14 @@ public class IMAudienceBidder {
                     .setUseHeaderBidding(true);
 
             if (!TextUtils.isEmpty(userId)) {
-                aerServConfig.setUserId(userId);
+                    aerServConfig.setUserId(userId);
             }
 
             if (dtbAdResponse != null) {
                 Double price = ApsUtil.getPrice(placement, dtbAdResponse);
                 if (price != null) {
                     aerServConfig.setAPSAdResponses(Collections.singletonList(dtbAdResponse));
+                    dtbAdResponse = null;
                 }
             }
 
@@ -506,36 +516,27 @@ public class IMAudienceBidder {
      *         into. Cannot be null.
      * @param audienceBidderListener AudienceBidder listener. Cannot be null.
      */
-    @NonNull
-    public BidToken updateBid(@NonNull Context context, String placement, @NonNull MoPubView moPubView,
-                              @NonNull IMAudienceBidderBannerListener audienceBidderListener) {
-
-        return updateBid(context, placement, moPubView, null, audienceBidderListener, 0);
+    @Deprecated
+    public void updateBid(@NonNull Context context, String placement, @NonNull MoPubView moPubView,
+                          @NonNull IMAudienceBidderBannerListener audienceBidderListener) {
+        BidToken bidToken = createBidToken(placement, moPubView, audienceBidderListener);
+        bidToken.updateBid(context, 0);
     }
 
     /**
      * Creates a bidToken and updates the MoPub Banner object with the keywords
      * corresponding to the bid. Any keywords in the format of "IMAB:X.XX" will
      * be removed on this call.
-     * @param context Current context. Cannot be null.
      * @param placement AerServ's placement id. Cannot be null or empty.
-     * @param dtbAdResponse Amazon's ad object with bid information. Can be null
-     *         if APS did no require with an ad.
      * @param moPubView MoPub banner object that the keyword will be injected
      *         into. Cannot be null.
      * @param audienceBidderListener AudienceBidder listener. Cannot be null.
-     * @param timeoutMillis Maximum time the listener has to return.
      */
     @NonNull
-    public BidToken updateBid(@NonNull Context context, String placement, @NonNull MoPubView moPubView,
-                              @Nullable DTBAdResponse dtbAdResponse,
-                              @NonNull IMAudienceBidderBannerListener audienceBidderListener,
-                              long timeoutMillis) {
+    public BidToken createBidToken(String placement, @NonNull MoPubView moPubView,
+                                   @NonNull IMAudienceBidderBannerListener audienceBidderListener) {
 
-        BidToken bidToken = new BannerBidToken(placement, moPubView, audienceBidderListener);
-        bidToken.refreshBid(context, dtbAdResponse, timeoutMillis);
-
-        return bidToken;
+        return new BannerBidToken(placement, moPubView, audienceBidderListener);
     }
 
     /**
@@ -548,36 +549,26 @@ public class IMAudienceBidder {
      *         into. Cannot be null.
      * @param audienceBidderListener AudienceBidder listener. Cannot be null.
      */
-    @NonNull
-    public BidToken updateBid(@NonNull Context context, String placement, @NonNull MoPubInterstitial moPubInterstitial,
-                              @NonNull IMAudienceBidderInterstitialListener audienceBidderListener) {
-
-        return updateBid(context, placement, moPubInterstitial, null, audienceBidderListener, 0);
+    @Deprecated
+    public void updateBid(@NonNull Context context, String placement, @NonNull MoPubInterstitial moPubInterstitial,
+                          @NonNull IMAudienceBidderInterstitialListener audienceBidderListener) {
+        BidToken bidToken = createBidToken(placement, moPubInterstitial, audienceBidderListener);
+        bidToken.updateBid(context, 0);
     }
 
     /**
      * Creates a bidToken and updates the MoPub Banner object with the keywords
      * corresponding to the bid. Any keywords in the format of "IMAB:X.XX" will
      * be removed on this call.
-     * @param context Current context. Cannot be null.
      * @param placement AerServ's placement id. Cannot be null or empty.
-     * @param dtbAdResponse Amazon's ad object with bid information. Can be null
-     *         if APS did no require with an ad.
      * @param moPubInterstitial MoPub interstitial object that the keyword will be injected
      *         into. Cannot be null.
      * @param audienceBidderListener AudienceBidder listener. Cannot be null.
-     * @param timeoutMillis Maximum time the listener has to return.
      */
     @NonNull
-    public BidToken updateBid(@NonNull Context context, String placement, @NonNull MoPubInterstitial moPubInterstitial,
-                              @Nullable DTBAdResponse dtbAdResponse,
-                              @NonNull IMAudienceBidderInterstitialListener audienceBidderListener,
-                              long timeoutMillis) {
-
-        BidToken bidToken = new InterstitialBidToken(placement, moPubInterstitial, audienceBidderListener);
-        bidToken.refreshBid(context, dtbAdResponse, timeoutMillis);
-
-        return bidToken;
+    public BidToken createBidToken(String placement, @NonNull MoPubInterstitial moPubInterstitial,
+                                   @NonNull IMAudienceBidderInterstitialListener audienceBidderListener) {
+        return new InterstitialBidToken(placement, moPubInterstitial, audienceBidderListener);
     }
 
     /**
@@ -590,77 +581,58 @@ public class IMAudienceBidder {
      *               cap.
      * @param audienceBidderListener AudienceBidder listener. Cannot be null.
      */
+    @Deprecated
+    public void updateBid(@NonNull Context context, String placement, @Nullable String userId,
+                          @NonNull IMAudienceBidderRewardedListener audienceBidderListener) {
+        BidToken bidToken = createBidToken(placement, userId, audienceBidderListener);
+        bidToken.updateBid(context, 0);
+    }
+
+    /**
+     * Creates a bidToken and updates the MoPub Banner object with the keywords
+     * corresponding to the bid. Any keywords in the format of "IMAB:X.XX" will
+     * be removed on this call.
+     * @param placement AerServ's placement id. Cannot be null or empty.
+     * @param userId User's userId within publisher system. This is meant to be used for frequency
+     *               cap.
+     * @param audienceBidderListener AudienceBidder listener. Cannot be null.
+     */
     @NonNull
-    public BidToken updateBid(@NonNull Context context, String placement, @Nullable String userId,
+    public BidToken createBidToken(String placement, @Nullable String userId,
                               @NonNull IMAudienceBidderRewardedListener audienceBidderListener) {
 
-        return updateBid(context, placement, userId, null, audienceBidderListener, 0);
-    }
-
-    /**
-     * Creates a bidToken and updates the MoPub Banner object with the keywords
-     * corresponding to the bid. Any keywords in the format of "IMAB:X.XX" will
-     * be removed on this call.
-     * @param context Current context. Cannot be null.
-     * @param placement AerServ's placement id. Cannot be null or empty.
-     * @param dtbAdResponse Amazon's ad object with bid information. Can be null
-     *         if APS did no require with an ad.
-     * @param userId User's userId within publisher system. This is meant to be used for frequency
-     *               cap.
-     * @param audienceBidderListener AudienceBidder listener. Cannot be null.
-     * @param timeoutMillis Maximum time the listener has to return.
-     */
-    @NonNull
-    public BidToken updateBid(@NonNull Context context, String placement, @Nullable String userId,
-                              @Nullable DTBAdResponse dtbAdResponse,
-                              @NonNull IMAudienceBidderRewardedListener audienceBidderListener,
-                              long timeoutMillis) {
-
-        BidToken bidToken = new RewardedBidToken(placement, userId, audienceBidderListener);
-        bidToken.refreshBid(context, dtbAdResponse, timeoutMillis);
-
-        return bidToken;
+        return new RewardedBidToken(placement, userId, audienceBidderListener);
     }
 
     @NonNull
     static String getBidKeyword(double buyerPrice, @AdTypes String adType) {
         double bidPrice;
 
-        if (AdTypes.INT.equals(adType)) {
-            if (buyerPrice < 0.01) {
-                bidPrice = 0.00;
-            } else if (buyerPrice >= 0.01 && buyerPrice < 0.05) {
-                bidPrice = 0.01;
-            } else if (buyerPrice >= 0.05 && buyerPrice < 0.10) {
-                bidPrice = 0.05;
-            } else if (buyerPrice >= 0.10 && buyerPrice < 2.00) {
-                int tmpPrice = (int) (buyerPrice * 100);
-                bidPrice = (tmpPrice - (tmpPrice % 10)) / 100.0;
-            } else if (buyerPrice >= 2.00 && buyerPrice < 4.00) {
-                int tmpPrice = (int) (buyerPrice * 100);
-                bidPrice = (tmpPrice - (tmpPrice % 50)) / 100.0;
-            } else if (buyerPrice >= 4.00 && buyerPrice < 75.00) {
-                bidPrice = (int) buyerPrice;
-            } else {
-                bidPrice = 75.00;
-            }
+        if (buyerPrice < 0.01) {
+            bidPrice = 0.00;
+        } else if (buyerPrice >= 0.01 && buyerPrice < 0.05) {
+            bidPrice = 0.01;
+        } else if (buyerPrice >= 0.05 && buyerPrice < 0.10) {
+            bidPrice = 0.05;
+        } else if (buyerPrice >= 0.10 && buyerPrice < 2.00) {
+            int tmpPrice = (int) (buyerPrice * 100);
+            bidPrice = (tmpPrice - (tmpPrice % 10)) / 100.0;
+        } else if (buyerPrice >= 2.00 && buyerPrice < 4.00) {
+            int tmpPrice = (int) (buyerPrice * 100);
+            bidPrice = (tmpPrice - (tmpPrice % 50)) / 100.0;
         } else {
-            if (buyerPrice < 0.01) {
-                bidPrice = 0.00;
-            } else if (buyerPrice >= 0.01 && buyerPrice < 0.05) {
-                bidPrice = 0.01;
-            } else if (buyerPrice >= 0.05 && buyerPrice < 0.10) {
-                bidPrice = 0.05;
-            } else if (buyerPrice >= 0.10 && buyerPrice < 2.00) {
-                int tmpPrice = (int) (buyerPrice * 100);
-                bidPrice = (tmpPrice - (tmpPrice % 10)) / 100.0;
-            } else if (buyerPrice >= 2.00 && buyerPrice < 4.00) {
-                int tmpPrice = (int) (buyerPrice * 100);
-                bidPrice = (tmpPrice - (tmpPrice % 50)) / 100.0;
-            } else if (buyerPrice >= 4.00 && buyerPrice < 30.00) {
-                bidPrice = (int) buyerPrice;
+            if (AdTypes.INT.equals(adType)) {
+                if (buyerPrice >= 4.00 && buyerPrice < 75.00) {
+                    bidPrice = (int) buyerPrice;
+                } else {
+                    bidPrice = 75.00;
+                }
             } else {
-                bidPrice = 30.00;
+                if (buyerPrice >= 4.00 && buyerPrice < 30.00) {
+                    bidPrice = (int) buyerPrice;
+                } else {
+                    bidPrice = 30.00;
+                }
             }
         }
 
@@ -674,27 +646,21 @@ public class IMAudienceBidder {
     static String getGranularBidKeyword(double buyerPrice, @AdTypes String adType) {
         double bidPrice;
 
-        if (AdTypes.INT.equals(adType)) {
-            if (buyerPrice < 0.01) {
-                bidPrice = 0.00;
-            } else if (buyerPrice >= 0.01 && buyerPrice < 0.05) {
-                bidPrice = 0.01;
-            } else if (buyerPrice >= 0.05 && buyerPrice < 0.10) {
-                bidPrice = 0.05;
-            } else if (buyerPrice < 75) {
+        if (buyerPrice < 0.01) {
+            bidPrice = 0.00;
+        } else if (buyerPrice >= 0.01 && buyerPrice < 0.05) {
+            bidPrice = 0.01;
+        } else if (buyerPrice >= 0.05 && buyerPrice < 0.10) {
+            bidPrice = 0.05;
+        } else if (AdTypes.INT.equals(adType)) {
+            if (buyerPrice < 75) {
                 int tmpPrice = (int) (buyerPrice * 100);
                 bidPrice = (tmpPrice - (tmpPrice % 10)) / 100.0;
             } else {
                 bidPrice = 75.00;
             }
         } else {
-            if (buyerPrice < 0.01) {
-                bidPrice = 0.00;
-            } else if (buyerPrice >= 0.01 && buyerPrice < 0.05) {
-                bidPrice = 0.01;
-            } else if (buyerPrice >= 0.05 && buyerPrice < 0.10) {
-                bidPrice = 0.05;
-            } else if (buyerPrice < 30.00) {
+            if (buyerPrice < 30.00) {
                 int tmpPrice = (int) (buyerPrice * 100);
                 bidPrice = (tmpPrice - (tmpPrice % 10)) / 100.0;
             } else {
