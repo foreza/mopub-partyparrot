@@ -29,6 +29,7 @@ dependencies {
 
     /* Selectively compile required dependencies instead */
     implementation files('libs/InMobiSDK.aar')
+    implementation files('libs/InMobiABMoPubPlugin.aar')
     implementation files('libs/DTBAndroidSDK-7.3.aar')
 
     /* Use the MoPub 5.5 aar and latest volley */
@@ -44,8 +45,4 @@ dependencies {
 
     implementation 'com.android.support:appcompat-v7:28.0.0'
     implementation 'com.android.support.constraint:constraint-layout:1.1.3'
-//    testImplementation 'junit:junit:4.12'
-//    androidTestImplementation 'com.android.support.test:runner:1.0.2'
-//    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
-
 }

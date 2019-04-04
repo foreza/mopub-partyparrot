@@ -1,18 +1,10 @@
 package party.parrot.partyparrot;
-
-import android.content.Context;
-import android.os.Debug;
-import android.os.Handler;
-import android.os.Looper;
 import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
-
-import com.aerserv.sdk.AerServSdk;
 
 import com.amazon.device.ads.AdError;
 import com.amazon.device.ads.AdRegistration;
@@ -20,25 +12,22 @@ import com.amazon.device.ads.DTBAdCallback;
 import com.amazon.device.ads.DTBAdRequest;
 import com.amazon.device.ads.DTBAdResponse;
 import com.amazon.device.ads.DTBAdSize;
-import com.inmobi.ads.InMobiAudienceBidder;
-import com.inmobi.plugin.mopub.IMABCustomEventBanner;
+
+
 import com.mopub.common.MoPub;
 import com.mopub.common.SdkConfiguration;
 import com.mopub.common.SdkInitializationListener;
-import com.mopub.common.logging.MoPubDefaultLogger;
 import com.mopub.common.logging.MoPubLog;
 import com.mopub.mobileads.MoPubErrorCode;
 import com.mopub.mobileads.MoPubInterstitial;
 import com.mopub.mobileads.MoPubView;
 
+
+import com.inmobi.ads.InMobiAudienceBidder;
+import com.inmobi.sdk.InMobiSdk;
+
 import com.inmobi.plugin.mopub.IMAudienceBidder;        // Required for IM AB
 
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Timer;
-import java.util.TimerTask;
-import java.util.logging.Level;
 
 public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdListener, MoPubInterstitial.InterstitialAdListener {
 
@@ -81,13 +70,9 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_party_main);
-
-
         initializeAdSDK();
-
         configureBanner();
         configureInterstitial();
-
         getDisplaySDKVersions();        // Update the view!
     }
 
@@ -137,13 +122,50 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         moPubView.setBannerAdListener(this);
         moPubView.setAdUnitId(bannerAdUnitID);
 
+
     }
 
 
-    // Will update the banner bid for the IMAB class.
+    // This method will update the banner bid for the IMAB class
     public void updateIMABForBanner() {
 
         Log.d(log, "updateIMABForBanner has been called.");
+
+        bannerBidToken = inMobiAudienceBidder.createBidToken(PartyMain.this, AB_BannerPLC,
+                moPubView, new IMAudienceBidder.IMAudienceBidderBannerListener() {
+
+                    @Override
+                    public void onBidRecieved(@NonNull final MoPubView m) {
+                        // Bid was received from Audience Bidder. Call loadAd on the updated bid object.
+                        // Note: If banner refresh is supported, we recommend that you keep track of this and only call loadAd the first time to kick off the refresh process.
+
+                        if (!bannerLoaded) {
+                            bannerLoaded = true;
+                            m.loadAd();
+                        }
+
+                    }
+
+                    @Override
+                    public void onBidFailed(@NonNull MoPubView m, @NonNull final Error error) {
+                        // No Bid received from Audience Bidder. Call loadAd on the bid object.
+                        // Note: If banner refresh is supported, we recommend that you keep track of this and only call loadAd the first time to kick off the refresh process.
+
+                        if (!bannerLoaded) {
+                            bannerLoaded = true;
+                            m.loadAd();
+                        }
+
+                    }
+
+                });
+    }
+
+
+    // Will update the banner bid for the IMAB class (original APS integration)
+    public void updateIMABForBannerWithAPSOriginalCall() {
+
+        Log.d(log, "updateIMABForBannerWithAPSOriginalCall has been called.");
 
         // Create the loader and set the APS params
         final DTBAdRequest loader = new DTBAdRequest();
@@ -155,8 +177,9 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
             @Override
             public void onFailure(AdError adError) {
 
+
                 // Bid should continue without APS. Update the bid.
-                bannerBidToken = inMobiAudienceBidder.createBidToken(AB_BannerPLC,
+                bannerBidToken = inMobiAudienceBidder.createBidToken(PartyMain.this, AB_BannerPLC,
                         moPubView, new IMAudienceBidder.IMAudienceBidderBannerListener() {
 
                     @Override
@@ -191,7 +214,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
             public void onSuccess(DTBAdResponse dtbAdResponse) {
 
                 // Bid should continue with APS. Create the bid token. (update the bid token with the response after)
-                bannerBidToken = inMobiAudienceBidder.createBidToken(AB_BannerPLC,
+                bannerBidToken = inMobiAudienceBidder.createBidToken(PartyMain.this, AB_BannerPLC,
                         moPubView, new IMAudienceBidder.IMAudienceBidderBannerListener() {
 
                     @Override
@@ -233,6 +256,9 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
         Log.d(log, "loadBanner called.");
         updateIMABForBanner();
+
+        // We'll have to do additional callbacks to support the APS call
+        // updateIMABForBannerWithAPSOriginalCall();
     }
 
 
@@ -249,7 +275,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
             public void onFailure(AdError adError) {
 
                 // No new ad from APS. Update bid for the next ad call
-                bannerBidToken.updateBid(PartyMain.this, bidTimeOut);
+                bannerBidToken.updateBid();
 
             }
 
@@ -258,7 +284,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
                 // We have a new ad from APS. Store that in the bid token, then update bid for the next ad call
                 bannerBidToken.setDTBAdResponse(dtbAdResponse);
-                bannerBidToken.updateBid(PartyMain.this, bidTimeOut);
+                bannerBidToken.updateBid();
             }
         });
 
@@ -269,8 +295,11 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     public void onBannerLoaded(MoPubView banner) {
         Log.d(log, "Banner Loaded with KW: " + moPubView.getKeywords());
 
-        // We will need to make a request to A9 each time the banner refreshes.
-        IMAB_refreshBannerBidForAPS();
+        // Update the bid for the next MoPub refresh ad call
+        bannerBidToken.updateBid();
+
+        // If we're using APS, we'll need to make an additional ad call to A9 (not used)
+        // IMAB_refreshBannerBidForAPS();
 
     }
 
@@ -279,8 +308,12 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     public void onBannerFailed(MoPubView banner, MoPubErrorCode errorCode) {
         Log.d(log, "Banner failed to load, " + errorCode);
 
-        // bannerBidToken.refreshBid(this, APS_RESPONSE, 5000);
-        IMAB_refreshBannerBidForAPS();
+        // Update the bid for the next MoPub refresh ad call
+        bannerBidToken.updateBid();
+
+        // If we're using APS, we'll need to make an additional ad call to A9 (not used)
+        // IMAB_refreshBannerBidForAPS();
+
     }
 
     // Sent when the user has tapped on the banner.
@@ -317,6 +350,8 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     public void loadInterstitial(View view) {
         if (supportAB) {
             IMAB_updateBidForInterstitial();
+
+            // IMAB_updateBidForInterstitialWithAPS();
             Log.d(log, "loadInterstitial -> Interstitial Loading, support Audience Bidder");
 
         } else {
@@ -334,13 +369,34 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     }
 
 
-    // Method for updating the Audience bidder for interstitials
-
-
-
+    // Method for updating the Audience bidder for an interstitial ad
     public void IMAB_updateBidForInterstitial() {
 
-        Log.d(log, "updateIMABForBanner has been called.");
+        // Create a bid token and define the listener methods
+        interstitialBidToken = inMobiAudienceBidder.createBidToken(PartyMain.this,
+                AB_InterstitialPLC, mInterstitial, new IMAudienceBidder.IMAudienceBidderInterstitialListener() {
+
+                    @Override
+                    public void onBidRecieved(@NonNull final MoPubInterstitial m) {
+
+                        // A bid was received - you may call load on the updated bid object that is returned.
+                        m.load();
+                    }
+
+                    @Override
+                    public void onBidFailed(@NonNull MoPubInterstitial m, @NonNull final Error error) {
+
+                        // No bid received - you may call load on the bid object
+                        m.load();
+                    }
+
+                });
+
+        Log.d(log, "IMAB_updateBidForInterstitial - loadInterstitial AB -> Interstitial Loading for Audience Bidder");
+    }
+
+
+    public void IMAB_updateBidForInterstitialWithAPS() {
 
         // Create the loader and set the APS params
         final DTBAdRequest loader = new DTBAdRequest();
@@ -351,7 +407,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
             public void onFailure(AdError adError) {
 
                 // Bid should continue without APS. Update the bid.
-                interstitialBidToken = inMobiAudienceBidder.createBidToken(
+                interstitialBidToken = inMobiAudienceBidder.createBidToken(PartyMain.this,
                         AB_InterstitialPLC, mInterstitial, new IMAudienceBidder.IMAudienceBidderInterstitialListener() {
 
                             @Override
@@ -376,7 +432,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
             public void onSuccess(DTBAdResponse dtbAdResponse) {
 
                 // Bid should continue with APS. Create the bid token. (update the bid token with the response after)
-                interstitialBidToken = inMobiAudienceBidder.createBidToken(
+                interstitialBidToken = inMobiAudienceBidder.createBidToken(PartyMain.this,
                         AB_InterstitialPLC, mInterstitial, new IMAudienceBidder.IMAudienceBidderInterstitialListener() {
 
                             @Override
@@ -422,7 +478,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
             public void onFailure(AdError adError) {
 
                 // No new ad from APS. Ensure the ad response is null, then update bid for the next ad call
-                interstitialBidToken.updateBid(PartyMain.this,bidTimeOut);
+                interstitialBidToken.updateBid();
 
             }
 
@@ -431,7 +487,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
                 // We have a new ad from APS. Store that in the bid token, then update bid for the next ad call
                 interstitialBidToken.setDTBAdResponse(dtbAdResponse);
-                interstitialBidToken.updateBid(PartyMain.this,bidTimeOut);
+                interstitialBidToken.updateBid();
 
             }
         });
@@ -445,17 +501,28 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
     @Override
     public void onInterstitialLoaded(MoPubInterstitial interstitial) {
         // The interstitial has been cached and is ready to be shown.
-        Log.d(log, "An Interstitial was loaded with kw: " + interstitial.getKeywords());
+        Log.d(log, "Interstitial loaded");
+
         interstitialReady = true;
-        // IMAB_refreshInterstitialBidForAPS();
+
     }
 
     @Override
     public void onInterstitialFailed(MoPubInterstitial interstitial, MoPubErrorCode errorCode) {
-        // The interstitial has failed to load. Inspect errorCode for additional information.
-        // This is an excellent place to load more ads.
+
         Log.d(log, "Interstitial load failed: " + errorCode);
-        // IMAB_refreshInterstitialBidForAPS();
+
+        // You may want to update the interstitial bid if we fail to load one.
+        interstitialBidToken.updateBid();
+
+    }
+
+    @Override
+    public void onInterstitialDismissed(MoPubInterstitial interstitial) {
+        Log.d(log, "Interstitial Dismissed, refreshing bid");
+
+        // We want to update the interstitial bid when the the interstitial has being dismissed
+        interstitialBidToken.updateBid();
 
     }
 
@@ -474,15 +541,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
 
     }
 
-    @Override
-    public void onInterstitialDismissed(MoPubInterstitial interstitial) {
-        // The interstitial has being dismissed. Resume / load state accordingly.
-        // This is an excellent place to load more ads.
-        Log.d(log, "Interstitial Dismissed, refreshing bid");
 
-        IMAB_refreshInterstitialBidForAPS();
-
-    }
 
 
     @Override
@@ -498,7 +557,7 @@ public class PartyMain extends AppCompatActivity implements MoPubView.BannerAdLi
         mpv.setText("MoPub SDK Version:" + MoPub.SDK_VERSION);
 
         TextView imv = findViewById(R.id.IMSdkVersion);
-        imv.setText("IM SDK Version:" + AerServSdk.getSdkVersion());
+        imv.setText("IM SDK Version:" + InMobiSdk.getVersion());
 
     }
 
